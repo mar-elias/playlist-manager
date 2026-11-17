@@ -42,8 +42,8 @@
  * The 'playback' preferences page controls whether the crossfading player backend is used,
  * and if enabled, the crossfade duration and network buffer size.
  *
- * Currently, the library and podcast sources add pages to the notebook, for configuring the
- * location and layout of the library and the podcast download location and update frequency.
+ * Currently, the library source adds a page to the notebook, for configuring the
+ * location and layout of the library.
  */
 
 #include <config.h>

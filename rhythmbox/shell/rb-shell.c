@@ -82,7 +82,6 @@
 #include "rb-shell-player.h"
 #include "rb-shell-preferences.h"
 #include "rb-library-source.h"
-#include "rb-podcast-source.h"
 #include "totem-pl-parser.h"
 #include "rb-shell-preferences.h"
 #include "rb-playlist-source.h"
@@ -95,9 +94,6 @@
 #include "rb-song-info.h"
 #include "rb-missing-plugins.h"
 #include "rb-header.h"
-#include "rb-podcast-manager.h"
-#include "rb-podcast-main-source.h"
-#include "rb-podcast-entry-types.h"
 #include "rb-ext-db.h"
 #include "rb-auto-playlist-source.h"
 #include "rb-builder-helpers.h"
@@ -215,8 +211,7 @@ enum
 	PROP_TRACK_TRANSFER_QUEUE,
 	PROP_AUTOSTARTED,
 	PROP_DISABLE_PLUGINS,
-	PROP_TASK_LIST,
-	PROP_PODCAST_MANAGER
+	PROP_TASK_LIST
 };
 
 enum
@@ -283,11 +278,9 @@ struct _RBShellPrivate
 	RBPlaylistManager *playlist_manager;
 	RBRemovableMediaManager *removable_media_manager;
 	RBTrackTransferQueue *track_transfer_queue;
-	RBPodcastManager *podcast_manager;
 	GtkWidget *task_list_display;
 
 	RBLibrarySource *library_source;
-	RBPodcastSource *podcast_source;
 	RBPlaylistSource *queue_source;
 	RBSource *missing_files_source;
 	RBSource *import_errors_source;
@@ -540,7 +533,6 @@ construct_widgets (RBShell *shell)
 	shell->priv->task_list_display = rb_task_list_display_new (rb_task_list_get_model (shell->priv->task_list));
 	gtk_widget_show (shell->priv->task_list_display);
 
-	shell->priv->podcast_manager = rb_podcast_manager_new (shell);
 	shell->priv->track_transfer_queue = rb_track_transfer_queue_new (shell);
 	shell->priv->accel_group = gtk_accel_group_new ();
 	gtk_window_add_accel_group (win, shell->priv->accel_group);
@@ -690,7 +682,6 @@ construct_sources (RBShell *shell)
 
 	page_group = RB_DISPLAY_PAGE_GROUP_LIBRARY;
 	shell->priv->library_source = RB_LIBRARY_SOURCE (rb_library_source_new (shell));
-	shell->priv->podcast_source = RB_PODCAST_SOURCE (rb_podcast_main_source_new (shell, shell->priv->podcast_manager));
 	shell->priv->missing_files_source = rb_missing_files_source_new (shell, shell->priv->library_source);
 
 	shell->priv->import_errors_source = rb_import_errors_source_new (shell,
@@ -699,11 +690,8 @@ construct_sources (RBShell *shell)
 									 RHYTHMDB_ENTRY_TYPE_IGNORE);
 
 	rb_shell_append_display_page (shell, RB_DISPLAY_PAGE (shell->priv->library_source), page_group);
-	rb_shell_append_display_page (shell, RB_DISPLAY_PAGE (shell->priv->podcast_source), page_group);
 	rb_shell_append_display_page (shell, RB_DISPLAY_PAGE (shell->priv->missing_files_source), page_group);
 	rb_shell_append_display_page (shell, RB_DISPLAY_PAGE (shell->priv->import_errors_source), page_group);
-
-	rb_podcast_main_source_add_subsources (RB_PODCAST_MAIN_SOURCE (shell->priv->podcast_source));
 
 	/* Initialize removable media manager */
 	rb_debug ("shell: creating removable media manager");
@@ -1277,18 +1265,6 @@ rb_shell_class_init (RBShellClass *klass)
 							      "task list",
 							      RB_TYPE_TASK_LIST,
 							      G_PARAM_READABLE));
-	/**
-	 * RBShell:podcast-manager:
-	 *
-	 * The #RBPodcastManager instance
-	 */
-	g_object_class_install_property (object_class,
-					 PROP_PODCAST_MANAGER,
-					 g_param_spec_object ("podcast-manager",
-							      "podcast manager",
-							      "podcast manager",
-							      RB_TYPE_PODCAST_MANAGER,
-							      G_PARAM_READABLE));
 
 	/**
 	 * RBShell::visibility-changed:
@@ -1517,9 +1493,6 @@ rb_shell_get_property (GObject *object,
 	case PROP_TASK_LIST:
 		g_value_set_object (value, shell->priv->task_list);
 		break;
-	case PROP_PODCAST_MANAGER:
-		g_value_set_object (value, shell->priv->podcast_manager);
-		break;
 	default:
 		G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
 		break;
@@ -1593,11 +1566,6 @@ rb_shell_finalize (GObject *object)
 		rb_debug ("unreffing removable media manager");
 		g_object_unref (shell->priv->removable_media_manager);
 		g_object_unref (shell->priv->track_transfer_queue);
-	}
-
-	if (shell->priv->podcast_manager != NULL) {
-		rb_debug ("unreffing podcast manager");
-		g_object_unref (shell->priv->podcast_manager);
 	}
 
 	if (shell->priv->clipboard_shell != NULL) {
@@ -2484,8 +2452,6 @@ rb_shell_quit (RBShell *shell,
 
 	rb_shell_player_stop (shell->priv->player_shell);
 
-	rb_podcast_manager_shutdown (shell->priv->podcast_manager);
-
 	rb_shell_sync_state (shell);
 
 	if (shell->priv->plugin_engine != NULL) {
@@ -2952,13 +2918,6 @@ rb_shell_load_uri (RBShell *shell,
 		   GError **error)
 {
 	RhythmDBEntry *entry;
-
-	/* If the URI points to a Podcast, pass it on to the Podcast source */
-	if (rb_uri_could_be_podcast (uri, NULL)) {
-		rb_shell_select_page (shell, RB_DISPLAY_PAGE (shell->priv->podcast_source));
-		rb_podcast_source_add_feed (shell->priv->podcast_source, uri);
-		return TRUE;
-	}
 
 	entry = rhythmdb_entry_lookup_by_location (shell->priv->db, uri);
 

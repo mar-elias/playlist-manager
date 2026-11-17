@@ -42,7 +42,6 @@ G_BEGIN_DECLS
 
 /* defined sync categories */
 #define		SYNC_CATEGORY_MUSIC		"music"
-#define 	SYNC_CATEGORY_PODCAST		"podcast"
 
 /* defined sync groups */
 #define		SYNC_GROUP_ALL_MUSIC		"x-rb-all-music"

@@ -42,7 +42,6 @@ struct _RBSyncBarData
 {
 	GtkWidget *widget;
 	guint music_segment;
-	guint podcast_segment;
 	guint other_segment;
 	guint free_segment;
 	guint64 capacity;

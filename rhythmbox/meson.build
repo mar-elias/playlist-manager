@@ -197,53 +197,9 @@ plugins = [
   'audioscrobbler',
   'dbus-media-server',
   'generic-player',
-  'iradio',
   'mpris',
   'power-manager'
 ]
-
-if enable_python
-  plugins += [
-    'rb',
-
-    'artsearch',
-    'gpodder',
-    'im-status',
-    'listenbrainz',
-    'lyrics',
-    'magnatune',
-    'mpdserver',
-    'pythonconsole',
-    'rbzeitgeist',
-    'replaygain',
-    'webremote',
-
-    # 'context'
-  ]
-endif
-
-libgpod = dependency('libgpod-1.0', version: '>= 0.7.92', required: get_option('ipod'))
-if libgpod.found()
-  plugins += 'ipod'
-endif
-
-libmtp = dependency('libmtp', version: '>= 0.3.0', required: get_option('mtp'))
-if libmtp.found()
-  cdata.set('WITH_LIBMTP', 1)
-  if gudev.found()
-    plugins += 'mtpdevice'
-  elif get_option('mtp').enabled()
-    error('MTP explicitly requested but GUdev is not available')
-  endif
-endif
-if gudev.found()
-  plugins += 'android'
-endif
-
-libnotify = dependency('libnotify', version: '>= 0.7.0', required: get_option('libnotify'))
-if libnotify.found()
-  plugins += 'notification'
-endif
 
 lirc = dependency('lirc', required: get_option('lirc'))
 if lirc.found()
@@ -307,7 +263,6 @@ summary({'Tests': check.found(),
         section: 'General',
         bool_yn: true)
 summary({'iPod integration': plugins.contains('ipod'),
-         'MTP integration': plugins.contains('mtpdevice'),
          'CD burning support': plugins.contains('brasero-disc-recorder'),
          'DAAP (music sharing) support': plugins.contains('daap'),
          'libnotify support': plugins.contains('notification'),
@@ -330,7 +285,6 @@ metadatainc = include_directories('metadata')
 rhythmdbinc = include_directories('rhythmdb')
 backendsinc = include_directories('backends', 'backends/gstreamer')
 pluginsinc = include_directories('plugins')
-podcastinc = include_directories('podcast')
 shellinc = include_directories('shell')
 sourcesinc = include_directories('sources', 'sources/sync')
 widgetsinc = include_directories('widgets')
@@ -343,7 +297,6 @@ subdir('lib/libmediaplayerid')
 subdir('metadata')
 subdir('rhythmdb')
 subdir('backends')
-subdir('podcast')
 subdir('sources')
 subdir('widgets')
 subdir('shell')

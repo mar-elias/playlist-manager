@@ -759,7 +759,7 @@ sync_delete_done_cb (GObject *source_object, GAsyncResult *result, gpointer data
 	RBMediaPlayerSourcePrivate *priv = MEDIA_PLAYER_SOURCE_GET_PRIVATE (source);
 	rb_debug ("finished deleting %d files from media player", priv->sync_state->sync_remove_count);
 
-	/* Transfer needed tracks and podcasts from itinerary to device */
+	/* Transfer needed tracks from itinerary to device */
 	if (priv->sync_state->sync_add_count != 0) {
 		RBTrackTransferBatch *batch;
 
@@ -793,9 +793,7 @@ sync_has_items_enabled (RBMediaPlayerSource *source)
 {
 	RBMediaPlayerSourcePrivate *priv = MEDIA_PLAYER_SOURCE_GET_PRIVATE (source);
 	if (rb_sync_settings_sync_category (priv->sync_settings, SYNC_CATEGORY_MUSIC) == FALSE &&
-	    rb_sync_settings_has_enabled_groups (priv->sync_settings, SYNC_CATEGORY_MUSIC) == FALSE &&
-	    rb_sync_settings_sync_category (priv->sync_settings, SYNC_CATEGORY_PODCAST) == FALSE &&
-	    rb_sync_settings_has_enabled_groups (priv->sync_settings, SYNC_CATEGORY_PODCAST) == FALSE) {
+	    rb_sync_settings_has_enabled_groups (priv->sync_settings, SYNC_CATEGORY_MUSIC) == FALSE) {
 		rb_debug ("no sync items are enabled");
 		return FALSE;
 	}
@@ -826,12 +824,12 @@ update_sync_settings_dialog (RBMediaPlayerSource *source)
 		can_continue = FALSE;
 		show_error = TRUE;
 		gtk_label_set_text (GTK_LABEL (priv->sync_dialog_label),
-				    _("You have not selected any music, playlists, or podcasts to transfer to this device."));
+				    _("You have not selected any music or playlists to transfer to this device."));
 	} else if (sync_has_enough_space (source) == FALSE) {
 		can_continue = TRUE;
 		show_error = TRUE;
 		gtk_label_set_text (GTK_LABEL (priv->sync_dialog_label),
-				    _("There is not enough space on the device to transfer the selected music, playlists and podcasts."));
+				    _("There is not enough space on the device to transfer the selected music and playlists."));
 	} else {
 		can_continue = TRUE;
 		show_error = FALSE;

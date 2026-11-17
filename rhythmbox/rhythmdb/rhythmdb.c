@@ -65,7 +65,6 @@
 #include "rb-dialog.h"
 #include "rb-string-value-map.h"
 #include "rb-async-queue-watch.h"
-#include "rb-podcast-entry-types.h"
 #include "rb-gst-media-types.h"
 
 #define PROP_ENTRY(p,t,n) { RHYTHMDB_PROP_ ## p, "RHYTHMDB_PROP_" #p "", t, n }
@@ -122,16 +121,6 @@ static const RhythmDBPropertyDef rhythmdb_properties[] = {
 	PROP_ENTRY(SEARCH_MATCH, G_TYPE_STRING, "search-match"),
 	PROP_ENTRY(YEAR, G_TYPE_ULONG, "year"),
 	PROP_ENTRY(KEYWORD, G_TYPE_STRING, "keyword"),
-
-	PROP_ENTRY(STATUS, G_TYPE_ULONG, "status"),
-	PROP_ENTRY(DESCRIPTION, G_TYPE_STRING, "description"),
-	PROP_ENTRY(SUBTITLE, G_TYPE_STRING, "subtitle"),
-	PROP_ENTRY(SUMMARY, G_TYPE_STRING, "summary"),
-	PROP_ENTRY(LANG, G_TYPE_STRING, "lang"),
-	PROP_ENTRY(COPYRIGHT, G_TYPE_STRING, "copyright"),
-	PROP_ENTRY(IMAGE, G_TYPE_STRING, "image"),
-	PROP_ENTRY(POST_TIME, G_TYPE_ULONG, "post-time"),
-	PROP_ENTRY(PODCAST_GUID, G_TYPE_STRING, "podcast-guid"),
 
 	PROP_ENTRY(MUSICBRAINZ_TRACKID, G_TYPE_STRING, "mb-trackid"),
 	PROP_ENTRY(MUSICBRAINZ_ARTISTID, G_TYPE_STRING, "mb-artistid"),
@@ -752,7 +741,6 @@ rhythmdb_init (RhythmDB *db)
 	db->priv->entry_type_map = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, g_object_unref);
 
 	rhythmdb_register_song_entry_types (db);
-	rb_podcast_register_entry_types (db);
 
 	db->priv->changed_entries = g_hash_table_new_full (NULL,
 							   NULL,
@@ -2214,12 +2202,6 @@ rhythmdb_process_stat_event (RhythmDB *db,
 			    (entry->type != event->entry_type) &&
 			    (entry->type != event->ignore_type) &&
 			    (entry->type != event->error_type)) {
-				if (event->entry_type == RHYTHMDB_ENTRY_TYPE_SONG &&
-				    entry->type == RHYTHMDB_ENTRY_TYPE_PODCAST_POST) {
-					rb_debug ("Ignoring stat event for '%s', it's already loaded as a podcast",
-						  rb_refstring_get (event->real_uri));
-					break;
-				}
 				g_warning ("attempt to use location %s in multiple entry types (%s and %s)",
 					   rb_refstring_get (event->real_uri),
 					   rhythmdb_entry_type_get_name (event->entry_type),
@@ -3523,7 +3505,6 @@ rhythmdb_entry_set_internal (RhythmDB *db,
 {
 	RhythmDBClass *klass = RHYTHMDB_GET_CLASS (db);
 	gboolean handled;
-	RhythmDBPodcastFields *podcast = NULL;
 	GValue conv_value = {0,};
 	GValue old_value = {0,};
 	gboolean nop;
@@ -3598,11 +3579,6 @@ rhythmdb_entry_set_internal (RhythmDB *db,
 	handled = klass->impl_entry_set (db, entry, propid, value);
 
 	if (!handled) {
-		if (entry->type == RHYTHMDB_ENTRY_TYPE_PODCAST_FEED ||
-		    entry->type == RHYTHMDB_ENTRY_TYPE_PODCAST_POST ||
-		    entry->type == RHYTHMDB_ENTRY_TYPE_PODCAST_SEARCH)
-			podcast = RHYTHMDB_ENTRY_GET_TYPE_DATA (entry, RhythmDBPodcastFields);
-
 		switch (propid) {
 		case RHYTHMDB_PROP_TYPE:
 		case RHYTHMDB_PROP_ENTRY_ID:
@@ -3782,54 +3758,6 @@ rhythmdb_entry_set_internal (RhythmDB *db,
 				entry->flags &= ~RHYTHMDB_ENTRY_HIDDEN;
 			}
 			entry->flags |= RHYTHMDB_ENTRY_LAST_SEEN_DIRTY;
-			break;
-		case RHYTHMDB_PROP_STATUS:
-			g_assert (podcast);
-			podcast->status = g_value_get_ulong (value);
-			break;
-		case RHYTHMDB_PROP_DESCRIPTION:
-			g_assert (podcast);
-			rb_refstring_unref (podcast->description);
-			podcast->description = rb_refstring_new (g_value_get_string (value));
-			break;
-		case RHYTHMDB_PROP_SUBTITLE:
-			g_assert (podcast);
-			rb_refstring_unref (podcast->subtitle);
-			podcast->subtitle = rb_refstring_new (g_value_get_string (value));
-			break;
-		case RHYTHMDB_PROP_SUMMARY:
-			g_assert_not_reached ();
-			break;
-		case RHYTHMDB_PROP_LANG:
-			g_assert (podcast);
-			if (podcast->lang != NULL) {
-				rb_refstring_unref (podcast->lang);
-			}
-			podcast->lang = rb_refstring_new (g_value_get_string (value));
-			break;
-		case RHYTHMDB_PROP_COPYRIGHT:
-			g_assert (podcast);
-			if (podcast->copyright != NULL) {
-				rb_refstring_unref (podcast->copyright);
-			}
-			podcast->copyright = rb_refstring_new (g_value_get_string (value));
-			break;
-		case RHYTHMDB_PROP_IMAGE:
-			g_assert (podcast);
-			if (podcast->image != NULL) {
-				rb_refstring_unref (podcast->image);
-			}
-			podcast->image = rb_refstring_new (g_value_get_string (value));
-			break;
-		case RHYTHMDB_PROP_POST_TIME:
-			g_assert (podcast);
-			podcast->post_time = g_value_get_ulong (value);
-			break;
-		case RHYTHMDB_PROP_PODCAST_GUID:
-			g_assert (podcast);
-			if (podcast->guid != NULL)
-				rb_refstring_unref (podcast->guid);
-			podcast->guid = rb_refstring_new (g_value_get_string (value));
 			break;
 		case RHYTHMDB_NUM_PROPERTIES:
 			g_assert_not_reached ();
@@ -4975,15 +4903,8 @@ const char *
 rhythmdb_entry_get_string (RhythmDBEntry *entry,
 			   RhythmDBPropType propid)
 {
-	RhythmDBPodcastFields *podcast = NULL;
-
 	g_return_val_if_fail (entry != NULL, NULL);
 	g_return_val_if_fail (entry->refcount > 0, NULL);
-
-	if (entry->type == RHYTHMDB_ENTRY_TYPE_PODCAST_FEED ||
-	    entry->type == RHYTHMDB_ENTRY_TYPE_PODCAST_POST ||
-	    entry->type == RHYTHMDB_ENTRY_TYPE_PODCAST_SEARCH)
-		podcast = RHYTHMDB_ENTRY_GET_TYPE_DATA (entry, RhythmDBPodcastFields);
 
 	rhythmdb_entry_sync_mirrored (entry, propid);
 
@@ -5084,40 +5005,6 @@ rhythmdb_entry_get_string (RhythmDBEntry *entry,
 		return NULL;
 	case RHYTHMDB_PROP_KEYWORD:
 		return NULL;
-
-	/* Podcast properties */
-	case RHYTHMDB_PROP_DESCRIPTION:
-		if (podcast)
-			return rb_refstring_get (podcast->description);
-		else
-			return NULL;
-	case RHYTHMDB_PROP_SUBTITLE:
-		if (podcast)
-			return rb_refstring_get (podcast->subtitle);
-		else
-			return NULL;
-	case RHYTHMDB_PROP_SUMMARY:
-		return NULL;
-	case RHYTHMDB_PROP_LANG:
-		if (podcast)
-			return rb_refstring_get (podcast->lang);
-		else
-			return NULL;
-	case RHYTHMDB_PROP_COPYRIGHT:
-		if (podcast)
-			return rb_refstring_get (podcast->copyright);
-		else
-			return NULL;
-	case RHYTHMDB_PROP_IMAGE:
-		if (podcast)
-			return rb_refstring_get (podcast->image);
-		else
-			return NULL;
-	case RHYTHMDB_PROP_PODCAST_GUID:
-		if (podcast)
-			return rb_refstring_get (podcast->guid);
-		else
-			return NULL;
 
 	default:
 		g_assert_not_reached ();
@@ -5299,14 +5186,7 @@ gulong
 rhythmdb_entry_get_ulong (RhythmDBEntry *entry,
 			  RhythmDBPropType propid)
 {
-	RhythmDBPodcastFields *podcast = NULL;
-
 	g_return_val_if_fail (entry != NULL, 0);
-
-	if (entry->type == RHYTHMDB_ENTRY_TYPE_PODCAST_FEED ||
-	    entry->type == RHYTHMDB_ENTRY_TYPE_PODCAST_POST ||
-	    entry->type == RHYTHMDB_ENTRY_TYPE_PODCAST_SEARCH)
-		podcast = RHYTHMDB_ENTRY_GET_TYPE_DATA (entry, RhythmDBPodcastFields);
 
 	switch (propid) {
 	case RHYTHMDB_PROP_ENTRY_ID:
@@ -5341,16 +5221,6 @@ rhythmdb_entry_get_ulong (RhythmDBEntry *entry,
 	case RHYTHMDB_PROP_YEAR:
 		if (g_date_valid (&entry->date))
 			return g_date_get_year (&entry->date);
-		else
-			return 0;
-	case RHYTHMDB_PROP_POST_TIME:
-		if (podcast)
-			return podcast->post_time;
-		else
-			return 0;
-	case RHYTHMDB_PROP_STATUS:
-		if (podcast)
-			return podcast->status;
 		else
 			return 0;
 	default:

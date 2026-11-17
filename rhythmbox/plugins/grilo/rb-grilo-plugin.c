@@ -52,7 +52,6 @@ static const char *ignored_plugins[] = {
 	"grl-filesystem",
 	"grl-magnatune",
 	"grl-optical-media",
-	"grl-podcasts",
 	"grl-tracker"
 };
 

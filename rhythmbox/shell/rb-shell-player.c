@@ -80,7 +80,6 @@
 #include "rb-playlist-source.h"
 #include "rb-play-queue-source.h"
 #include "rhythmdb.h"
-#include "rb-podcast-manager.h"
 #include "rb-missing-plugins.h"
 #include "rb-ext-db.h"
 

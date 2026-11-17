@@ -53,9 +53,7 @@ struct _RBSyncState
 	GObject parent;
 
 	guint64 total_music_size;
-	guint64 total_podcast_size;
 	guint64 sync_music_size;
-	guint64 sync_podcast_size;
 
 	guint64 sync_space_needed;
 	guint64 sync_add_size;

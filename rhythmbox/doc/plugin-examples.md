@@ -91,24 +91,6 @@ if playlist_model_entries:
         print "Playlist image: %s, name: %s, source: %s" % (playlist_item[1], playlist_item[2], playlist_item[3])
 ```
 
-## How do I get a list of the user's podcast feeds?
-
-You can interrogate the [class@RhythmDB] object to find out a number of things to do with the users library.
-The following example will print out the users podcast feed:
-
-```
-db = shell.get_property("db")
-
-def print_podcast_info(entry):
-    """Takes a podcast entry and prints out its info"""
-    name = entry.get_string(RB.RhythmDBPropType.ARTIST)
-    uri = entry.get_string(RB.RhythmDBPropType.LOCATION)
-    print "%s: %s" % (name, uri)
-
-db.entry_foreach_by_type(db.entry_type_get_by_name("podcast-feed"), print_podcast_info)
-
-```
-
 ## How do I create a new "Page Group"?
 
 First, we need to create a new "page group" type and register it with RB.

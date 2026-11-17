@@ -425,10 +425,6 @@ rhythmdb_property_model_set_property (GObject *object,
 			append_sort_property (model, RHYTHMDB_PROP_ALBUM_SORTNAME);
 			append_sort_property (model, RHYTHMDB_PROP_ALBUM);
 			break;
-		case RHYTHMDB_PROP_SUBTITLE:
-			append_sort_property (model, RHYTHMDB_PROP_ALBUM);
-			append_sort_property (model, RHYTHMDB_PROP_SUBTITLE);
-			break;
 		case RHYTHMDB_PROP_TITLE:
 		case RHYTHMDB_PROP_LOCATION:
 			append_sort_property (model, RHYTHMDB_PROP_TITLE_SORTNAME);
@@ -1400,7 +1396,6 @@ rhythmdb_property_model_enable_drag (RhythmDBPropertyModel *model,
 		n_elements = G_N_ELEMENTS (targets_artist);
 		break;
 	case RHYTHMDB_PROP_LOCATION:
-	case RHYTHMDB_PROP_SUBTITLE:		/* more or less */
 		targets = targets_location;
 		n_elements = G_N_ELEMENTS (targets_location);
 		break;

@@ -7,7 +7,6 @@ option('ipod', type: 'feature', value: 'disabled', description: 'Enable iPod sup
 option('libnotify', type: 'feature', value: 'disabled', description: 'Enable desktop notifications with libnotify')
 option('libsecret', type: 'feature', value: 'disabled', description: 'Enable keyring support using libsecret')
 option('lirc', type: 'feature', value: 'disabled', description: 'Enable lirc support')
-option('mtp', type: 'feature', value: 'disabled', description: 'Enable MTP support')
 option('plugins_python', type: 'feature', value: 'disabled', description: 'Enable Python plugins')
 option('plugins_vala', type: 'feature', value: 'disabled', description: 'Enable Vala plugins')
 option('sample-plugins', type: 'boolean', value: false, description: 'Whether to install sample plugins')

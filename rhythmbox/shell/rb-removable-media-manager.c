@@ -44,28 +44,6 @@
 #if defined(HAVE_GUDEV)
 #define G_UDEV_API_IS_SUBJECT_TO_CHANGE
 #include <gudev/gudev.h>
-
-#if defined(WITH_LIBMTP)
-#include <libmtp.h>
-
-/* bug flags set for Android devices */
-#define DEVICE_FLAG_UNLOAD_DRIVER		0x00000002
-#define DEVICE_FLAG_BROKEN_MTPGETOBJPROPLIST	0x00000004
-#define DEVICE_FLAG_BROKEN_SET_OBJECT_PROPLIST  0x00000100
-#define DEVICE_FLAG_BROKEN_SEND_OBJECT_PROPLIST 0x00008000
-#define DEVICE_FLAG_LONG_TIMEOUT		0x08000000
-#define DEVICE_FLAG_FORCE_RESET_ON_CLOSE	0x10000000
-
-/* Nexus/Pixel (MTP) (1831:4ee1) masks off BROKEN_MTPGETOBJPROPLIST */
-#define DEVICE_FLAGS_ANDROID_BUGS (\
-	/*DEVICE_FLAG_BROKEN_MTPGETOBJPROPLIST |*/ \
-	DEVICE_FLAG_BROKEN_SET_OBJECT_PROPLIST | \
-	DEVICE_FLAG_BROKEN_SEND_OBJECT_PROPLIST | \
-	DEVICE_FLAG_UNLOAD_DRIVER | \
-	DEVICE_FLAG_LONG_TIMEOUT | \
-	DEVICE_FLAG_FORCE_RESET_ON_CLOSE)
-
-#endif /* WITH_LIBMTP */
 #endif /* HAVE_GUDEV */
 
 #include "rb-removable-media-manager.h"
@@ -939,21 +917,6 @@ rb_removable_media_manager_get_gudev_device (RBRemovableMediaManager *manager, G
 #endif
 }
 
-#if defined(HAVE_GUDEV)
-static int
-get_property_as_int (GUdevDevice *device, const char *property, int base)
-{
-	const char *strvalue;
-
-	strvalue = g_udev_device_get_property (device, property);
-	if (strvalue == NULL) {
-		return 0;
-	}
-
-	return strtol (strvalue, NULL, base);
-}
-#endif
-
 /**
  * rb_removable_media_manager_device_is_android:
  * @manager: the #RBRemovableMediaManager
@@ -970,13 +933,6 @@ rb_removable_media_manager_device_is_android (RBRemovableMediaManager *manager, 
 	return TRUE;
 #else
 	GUdevDevice *device = G_UDEV_DEVICE (gdevice);
-#if defined(WITH_LIBMTP)
-	LIBMTP_device_entry_t *device_list;
-	int numdevs;
-	int i;
-#endif
-	int vendor;
-	int model;
 
 	if (g_strcmp0 (g_udev_device_get_subsystem (device), "usb") != 0) {
 		rb_debug ("device %s is not a USB device", g_udev_device_get_name (device));
@@ -994,27 +950,7 @@ rb_removable_media_manager_device_is_android (RBRemovableMediaManager *manager, 
 		return FALSE;
 	}
 
-	vendor = get_property_as_int (device, "ID_VENDOR_ID", 16);
-	model = get_property_as_int (device, "ID_MODEL_ID", 16);
-#if defined(WITH_LIBMTP)
-
-	rb_debug ("matching device %x:%x against libmtp device list", vendor, model);
-	LIBMTP_Get_Supported_Devices_List(&device_list, &numdevs);
-	for (i = 0; i < numdevs; i++) {
-		if (device_list[i].vendor_id == vendor &&
-		    device_list[i].product_id == model) {
-			rb_debug ("matched libmtp device vendor %s product %s", device_list[i].vendor, device_list[i].product);
-			if ((device_list[i].device_flags & DEVICE_FLAGS_ANDROID_BUGS) != DEVICE_FLAGS_ANDROID_BUGS) {
-				rb_debug ("device doesn't have all android bug flags set");
-				return FALSE;
-			} else {
-				rb_debug ("device has android bug flags set");
-				return TRUE;
-			}
-		}
-	}
-#endif
-	rb_debug ("unable to match device %x:%x against device list, assuming android", vendor, model);
+	rb_debug ("device %s looks like an android device", g_udev_device_get_name (device));
 	return TRUE;
 #endif
 }

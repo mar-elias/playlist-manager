@@ -59,12 +59,12 @@ shell_c_args = [
 
 rhythmbox_core_include_directories = [
   configinc, libinc, mpidinc, metadatainc, rhythmdbinc, backendsinc, pluginsinc,
-  podcastinc, sourcesinc, widgetsinc, include_directories('.'),
+  sourcesinc, widgetsinc, include_directories('.'),
 ]
 
 rhythmbox_core_deps = [
   common_deps, mediaplayerid_dep, librb_dep, rhythmdb_dep, rbbackends_dep, rbmetadata_dep,
-  rbpodcast_dep, rbwidgets_dep, sources_dep, libmtp
+  rbwidgets_dep, sources_dep
 ]
 
 if enable_python
@@ -97,10 +97,9 @@ rb_gir = gnome.generate_gir(librhythmbox_core,
   dependencies: common_deps,
   link_with: [],
   extra_args: [ '--accept-unprefixed'],
-  sources: lib_headers + lib_sources + 
+  sources: lib_headers + lib_sources +
     backends_sources + backends_headers +
     metadata_sources + metadata_headers +
-    podcast_sources + podcast_headers +
     rhythmdb_sources + rhythmdb_headers +
     shell_sources + shell_headers +
     sources_sources + sources_headers +

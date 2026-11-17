@@ -64,7 +64,7 @@ sources_lib = static_library('sources', sources_sources,
   c_args: sources_c_args,
   include_directories: [configinc, shellinc, sourcesinc, widgetsinc, include_directories('sync')],
   dependencies: sources_dependencies + [librb_dep, rhythmdb_dep,
-    rbbackends_dep, rbmetadata_dep, rbpodcast_dep],
+    rbbackends_dep, rbmetadata_dep],
   install: false,
 )
 

@@ -53,7 +53,6 @@
 #include "rb-debug.h"
 #include "rb-util.h"
 #include "rb-file-helpers.h"
-#include "rb-podcast-entry-types.h"
 
 typedef struct RhythmDBTreeProperty
 {
@@ -326,7 +325,6 @@ struct RhythmDBTreeLoadContext
 	guint has_date : 1;
 	guint canonicalise_uris : 1;
 	guint reload_all_metadata : 1;
-	guint update_podcasts : 1;
 	guint update_local_mountpoints : 1;
 };
 
@@ -387,8 +385,6 @@ rhythmdb_tree_parser_start_element (struct RhythmDBTreeLoadContext *ctx,
 							ctx->canonicalise_uris = TRUE;
 						}
 					case 150:
-						rb_debug ("Upgrade Podcasts remote vs. local locations");
-						ctx->update_podcasts = TRUE;
 					case 160:
 						rb_debug ("reloading all file metadata to get sortnames, album artist, comments, bpm and updating mountpoints");
 						ctx->reload_all_metadata = TRUE;
@@ -519,30 +515,6 @@ rhythmdb_tree_parser_end_element (struct RhythmDBTreeLoadContext *ctx,
 			rb_debug ("pre-Date entry found, causing re-read");
 			ctx->entry->mtime = 0;
 		}
-		if (ctx->entry->type == RHYTHMDB_ENTRY_TYPE_PODCAST_FEED) {
-			RhythmDBPodcastFields *podcast = RHYTHMDB_ENTRY_GET_TYPE_DATA (ctx->entry, RhythmDBPodcastFields);
-			/* Handle upgrades from 0.9.2.
-			 * Previously, last-seen for podcast feeds was the time of the last post,
-			 * and post-time was unused.  Now, we want last-seen to be the time we
-			 * last updated the feed, and post-time to be the time of the last post.
-			 */
-			if (podcast->post_time == 0) {
-				podcast->post_time = ctx->entry->last_seen;
-			}
-		}
-		if (ctx->entry->type == RHYTHMDB_ENTRY_TYPE_PODCAST_POST) {
-			/* When upgrading Podcasts from 0.11.6 and prior, we need to
-			 * swap mountpoint and location if there is a mountpoint */
-			if (ctx->update_podcasts && ctx->entry->mountpoint != NULL) {
-				RBRefString *tmp;
-
-				rb_debug ("pre-Podcast avoidance found, swapping location/mountpoint");
-
-				tmp = ctx->entry->location;
-				ctx->entry->location = ctx->entry->mountpoint;
-				ctx->entry->mountpoint = tmp;
-			}
-		}
 		if (ctx->entry->type == RHYTHMDB_ENTRY_TYPE_SONG) {
 			/* Since we now care about mountpoints for all local entries, not just
 			 * those on things that actually get mounted and unmounted, we need to
@@ -572,29 +544,6 @@ rhythmdb_tree_parser_end_element (struct RhythmDBTreeLoadContext *ctx,
 			g_mutex_lock (&ctx->db->priv->entries_lock);
 			entry = g_hash_table_lookup (ctx->db->priv->entries, ctx->entry->location);
 			if (entry == NULL) {
-				rhythmdb_tree_entry_new_internal (RHYTHMDB (ctx->db), ctx->entry);
-				rhythmdb_entry_insert (RHYTHMDB (ctx->db), ctx->entry);
-				if (++ctx->batch_count == RHYTHMDB_QUERY_MODEL_SUGGESTED_UPDATE_CHUNK) {
-					rhythmdb_commit (RHYTHMDB (ctx->db));
-					ctx->batch_count = 0;
-				}
-			} else if (ctx->entry->type == RHYTHMDB_ENTRY_TYPE_PODCAST_POST &&
-				   entry->type == RHYTHMDB_ENTRY_TYPE_SONG) {
-				rb_debug ("found song entry with duplicate location for Podcast post %s. merging metadata",
-					  rb_refstring_get (ctx->entry->location));
-
-				ctx->entry->play_count += entry->play_count;
-				if (ctx->entry->last_played < entry->last_played)
-					ctx->entry->last_played = entry->last_played;
-
-				/* Remove the song entry,
-				 * deleting requires relinquishing the locks */
-				g_mutex_unlock (&ctx->db->priv->entries_lock);
-				rhythmdb_entry_delete (RHYTHMDB(ctx->db), entry);
-				g_mutex_lock (&ctx->db->priv->entries_lock);
-				rhythmdb_commit (RHYTHMDB (ctx->db));
-
-				/* And add the Podcast entry to the database */
 				rhythmdb_tree_entry_new_internal (RHYTHMDB (ctx->db), ctx->entry);
 				rhythmdb_entry_insert (RHYTHMDB (ctx->db), ctx->entry);
 				if (++ctx->batch_count == RHYTHMDB_QUERY_MODEL_SUGGESTED_UPDATE_CHUNK) {
@@ -674,7 +623,6 @@ rhythmdb_tree_parser_end_element (struct RhythmDBTreeLoadContext *ctx,
 		case RHYTHMDB_PROP_TRACK_PEAK:
 		case RHYTHMDB_PROP_ALBUM_GAIN:
 		case RHYTHMDB_PROP_ALBUM_PEAK:
-		case RHYTHMDB_PROP_SUMMARY:
 			skip = TRUE;
 			break;
 		default:
@@ -962,16 +910,11 @@ save_entry (RhythmDBTree *db,
 	    struct RhythmDBTreeSaveContext *ctx)
 {
 	RhythmDBPropType i;
-	RhythmDBPodcastFields *podcast = NULL;
 	xmlChar *encoded;
 	GList *keywords, *l;
 
 	if (ctx->error)
 		return;
-
-	if (entry->type == RHYTHMDB_ENTRY_TYPE_PODCAST_FEED ||
-	    entry->type == RHYTHMDB_ENTRY_TYPE_PODCAST_POST)
-		podcast = RHYTHMDB_ENTRY_GET_TYPE_DATA (entry, RhythmDBPodcastFields);
 
 	RHYTHMDB_FWRITE_STATICSTR ("  <entry type=\"", ctx->handle, ctx->error);
 	encoded	= xmlEncodeEntitiesReentrant (NULL, BAD_CAST rhythmdb_entry_type_get_name (entry->type));
@@ -1105,38 +1048,6 @@ save_entry (RhythmDBTree *db,
 				save_entry_boolean (ctx, elt_name, hidden);
 			}
 			break;
-		case RHYTHMDB_PROP_STATUS:
-			if (podcast)
-				save_entry_ulong (ctx, elt_name, podcast->status, FALSE);
-			break;
-		case RHYTHMDB_PROP_DESCRIPTION:
-			if (podcast && podcast->description)
-				save_entry_string(ctx, elt_name, rb_refstring_get (podcast->description));
-			break;
-		case RHYTHMDB_PROP_SUBTITLE:
-			if (podcast && podcast->subtitle)
-				save_entry_string(ctx, elt_name, rb_refstring_get (podcast->subtitle));
-			break;
-		case RHYTHMDB_PROP_LANG:
-			if (podcast && podcast->lang)
-				save_entry_string(ctx, elt_name, rb_refstring_get (podcast->lang));
-			break;
-		case RHYTHMDB_PROP_COPYRIGHT:
-			if (podcast && podcast->copyright)
-				save_entry_string(ctx, elt_name, rb_refstring_get (podcast->copyright));
-			break;
-		case RHYTHMDB_PROP_IMAGE:
-			if (podcast && podcast->image)
-				save_entry_string(ctx, elt_name, rb_refstring_get (podcast->image));
-			break;
-		case RHYTHMDB_PROP_POST_TIME:
-			if (podcast)
-				save_entry_ulong (ctx, elt_name, podcast->post_time, FALSE);
-			break;
-		case RHYTHMDB_PROP_PODCAST_GUID:
-			if (podcast && podcast->guid)
-				save_entry_string(ctx, elt_name, rb_refstring_get (podcast->guid));
-			break;
 		case RHYTHMDB_PROP_KEYWORD:
 			keywords = rhythmdb_entry_keywords_get (RHYTHMDB (db), entry);
 
@@ -1188,8 +1099,6 @@ save_entry (RhythmDBTree *db,
 		case RHYTHMDB_PROP_TRACK_PEAK:
 		case RHYTHMDB_PROP_ALBUM_GAIN:
 		case RHYTHMDB_PROP_ALBUM_PEAK:
-		/* obsolete podcast properties */
-		case RHYTHMDB_PROP_SUMMARY:
 			break;
 		}
 	}

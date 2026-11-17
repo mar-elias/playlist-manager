@@ -16,7 +16,7 @@
     <p>
       Rhythmbox is a music management application, designed to work well under the GNOME
       desktop. In addition to music stored on your computer, it supports network shares,
-      podcasts, radio streams, portable music devices (including phones), and internet music
+      radio streams, portable music devices (including phones), and internet music
       services such as Last.fm and Magnatune.
     </p>
     <p>
@@ -53,8 +53,7 @@
       <description>
 	<p>
 	  This version improves lyrics search, fixes bugs in the new player backend and
-	  enables it by default, and introduces a plugin implementing podcast feed and
-	  episode sync using the gPodder.net API.
+	  enables it by default.
         </p>
       </description>
     </release>
@@ -91,8 +90,8 @@
     <release version="3.4.5" date="2022-05-02">
       <description>
 	<p>
-	  This new version fixes a number of bugs, especially related to podcast
-	  updates and downloads, and transfers to Android and MTP devices.
+	  This new version fixes a number of bugs, especially related to
+	  transfers to Android and MTP devices.
         </p>
       </description>
     </release>

@@ -87,7 +87,7 @@ The "track list" is an instance of the [class@EntryView] class which uses a [cla
 
 ### Lower-level database
 
-Almost all of the data in Rhythmbox is stored in a database called [class@RhythmDB]. The most important data structure in the database is the ''entry'' [struct@RhythmDBEntry] which represents a single track, podcast episode, podcast feed, radio station or similar item. Each entry has a set of properties with associated values, such as "title", "artist", "play count" and so one; one of these properties is special, the "location" which must be unique among all the entries in the database.  Entries are identified with an entry type ([class@RhythmDBEntryType]) which defines some aspects of the entry's behaviour.
+Almost all of the data in Rhythmbox is stored in a database called [class@RhythmDB]. The most important data structure in the database is the ''entry'' [struct@RhythmDBEntry] which represents a single track, radio station or similar item. Each entry has a set of properties with associated values, such as "title", "artist", "play count" and so one; one of these properties is special, the "location" which must be unique among all the entries in the database.  Entries are identified with an entry type ([class@RhythmDBEntryType]) which defines some aspects of the entry's behaviour.
 
 ### Higher-level database
 

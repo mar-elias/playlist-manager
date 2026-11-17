@@ -37,18 +37,6 @@ G_BEGIN_DECLS
 RhythmDBEntry * rhythmdb_entry_allocate		(RhythmDB *db, RhythmDBEntryType *type);
 void		rhythmdb_entry_insert		(RhythmDB *db, RhythmDBEntry *entry);
 
-typedef struct {
-	/* podcast */
-	RBRefString *description;
-	RBRefString *subtitle;
-	RBRefString *lang;
-	RBRefString *copyright;
-	RBRefString *image;
-	RBRefString *guid;
-	gulong status;
-	gulong post_time;
-} RhythmDBPodcastFields;
-
 enum {
 	RHYTHMDB_ENTRY_HIDDEN = 1,
 	RHYTHMDB_ENTRY_INSERTED = 2,

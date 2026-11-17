@@ -167,33 +167,6 @@
     <child name='encoding' schema='org.gnome.rhythmbox.encoding-settings'/>
     <child name='source' schema='org.gnome.rhythmbox.source'/>
   </schema>
-  <enum id="org.gnome.rhythmbox.podcast-interval">
-    <value nick="hourly" value="0"/>
-    <value nick="daily" value="1"/>
-    <value nick="weekly" value="2"/>
-    <value nick="manual" value="3"/>
-  </enum>
-  <schema id="org.gnome.rhythmbox.podcast-source" extends="org.gnome.rhythmbox.source">
-    <override name="sorting">('Feed',true)</override>
-    <override name="paned-position">180</override>
-    <override name="show-browser">true</override>
-    <override name="search-type">'search-match'</override>
-  </schema>
-  <schema id="org.gnome.rhythmbox.podcast" path="/org/gnome/rhythmbox/podcast/">
-
-    <key name="download-interval" enum='org.gnome.rhythmbox.podcast-interval'>
-      <default>'hourly'</default>
-      <summary>How frequently to check for new podcast episodes</summary>
-      <description>How frequently to check for new podcast episodes. Can be hourly, daily, weekly, or manual.</description>
-    </key>
-    <key name="download-location" type="s">
-      <default>''</default>
-      <summary>URI of a directory to download podcast episodes to</summary>
-      <description>URI of a directory to download podcast episodes to</description>
-    </key>
-
-    <child name='source' schema='org.gnome.rhythmbox.podcast-source'/>
-  </schema>
   <schema id="org.gnome.rhythmbox.sharing" path="/org/gnome/rhythmbox/sharing/">
     <key name="enable-browsing" type="b">
       <default>true</default>
@@ -383,11 +356,6 @@
     <child name="source" schema="org.gnome.rhythmbox.source"/>
   </schema>
 
-  <schema id="org.gnome.rhythmbox.plugins.mtpdevice" path="/org/gnome/rhythmbox/plugins/mtpdevice/">
-    <child name="source" schema="org.gnome.rhythmbox.source"/>
-    <child name="encoding" schema="org.gnome.rhythmbox.encoding-settings"/>
-  </schema>
-
   <enum id="org.gnome.rhythmbox.plugins.replaygain.mode">
     <value nick="radio" value="0"/>
     <value nick="album" value="1"/>
@@ -432,34 +400,6 @@
       <default>''</default>
       <summary>Passphrase for the web remote control interface</summary>
       <description>Passphrase for the web remote control interface</description>
-    </key>
-  </schema>
-
-  <schema id="org.gnome.rhythmbox.plugins.gpodder" path="/org/gnome/rhythmbox/plugins/gpodder/">
-    <key name="mygpo-url" type="s">
-      <default>'https://gpodder.net/'</default>
-      <summary>Root URL for gpodder.net API server</summary>
-      <description>Root URL for gpodder.net API server</description>
-    </key>
-    <key name="device-id" type="s">
-      <default>''</default>
-      <summary>Device ID for gpodder.net API calls</summary>
-      <description>Device ID for gpodder.net API calls</description>
-    </key>
-    <key name="search" type="b">
-      <default>true</default>
-      <summary>Whether to search for podcasts using the gpodder.net API</summary>
-      <description>Whether to search for podcasts using the gpodder.net API</description>
-    </key>
-    <key name="feed-sync" type="b">
-      <default>false</default>
-      <summary>Whether to sync podcast feed subscriptions with the gpodder.net API</summary>
-      <description>Whether to sync podcast feed subscriptions with the gpodder.net API</description>
-    </key>
-    <key name="episode-sync" type="b">
-      <default>false</default>
-      <summary>Whether to sync podcast episode actions with the gpodder.net API</summary>
-      <description>Whether to sync podcast episode actions with the gpodder.net API</description>
     </key>
   </schema>
 

@@ -39,7 +39,6 @@
 
 #include "rhythmdb.h"
 #include "rhythmdb-tree.h"
-#include "rb-podcast-entry-types.h"
 
 /* test utils */
 gboolean waiting, signaled;
@@ -120,8 +119,6 @@ main (int argc, char **argv)
 
 			rhythmdb_entry_delete_by_type (db, RHYTHMDB_ENTRY_TYPE_SONG);
 			rhythmdb_entry_delete_by_type (db, rhythmdb_entry_type_get_by_name (db, "iradio"));
-			rhythmdb_entry_delete_by_type (db, RHYTHMDB_ENTRY_TYPE_PODCAST_FEED);
-			rhythmdb_entry_delete_by_type (db, RHYTHMDB_ENTRY_TYPE_PODCAST_POST);
 		}
 		rb_profile_end ("10 rhythmdb loads");
 		g_print ("completed %d loads\n", i * 10);

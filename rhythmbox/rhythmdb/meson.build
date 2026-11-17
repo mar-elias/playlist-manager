@@ -43,7 +43,7 @@ endif
 librhythmdb = static_library('rhythmdb', rhythmdb_sources,
   c_args: c_args,
   dependencies: [common_deps, librb_dep],
-  include_directories: [podcastinc, widgetsinc])
+  include_directories: [widgetsinc])
 
 rhythmdb_dep = declare_dependency(
   link_with: librhythmdb,

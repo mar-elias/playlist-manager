@@ -51,7 +51,6 @@
 #include "rb-source.h"
 #include "rb-cut-and-paste-code.h"
 #include "rb-util.h"
-#include "rb-podcast-entry-types.h"
 #include "rb-audioscrobbler-entry.h"
 
 #define CLIENT_ID "rbx"
@@ -569,10 +568,6 @@ rb_audioscrobbler_is_queueable (RhythmDBEntry *entry)
 	g_object_get (type, "category", &category, NULL);
 	if (category != RHYTHMDB_ENTRY_NORMAL) {
 		rb_debug ("entry %s is not queueable: category not NORMAL", rhythmdb_entry_get_string (entry, RHYTHMDB_PROP_LOCATION));
-		return FALSE;
-	}
-	if (type == RHYTHMDB_ENTRY_TYPE_PODCAST_POST) {
-		rb_debug ("entry %s is not queueable: is a podcast post", rhythmdb_entry_get_string (entry, RHYTHMDB_PROP_LOCATION));
 		return FALSE;
 	}
 	if (rhythmdb_entry_get_string (entry, RHYTHMDB_PROP_PLAYBACK_ERROR)) {

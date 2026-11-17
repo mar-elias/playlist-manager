@@ -34,7 +34,6 @@
 #include "rb-debug.h"
 #include "rb-util.h"
 #include "rb-playlist-manager.h"
-#include "rb-podcast-entry-types.h"
 
 struct _RBSyncSettingsUIPrivate
 {
@@ -192,19 +191,16 @@ impl_constructed (GObject *object)
 	RBSyncSettingsUI *ui = RB_SYNC_SETTINGS_UI (object);
 	GtkTreeIter tree_iter;
 	GtkTreeIter parent_iter;
-	GtkTreeModel *query_model;
 	GtkCellRenderer *renderer;
 	GtkTreeViewColumn *col;
 	GtkWidget *tree_view;
 	GList *l;
 	GList *playlists;
 	RBShell *shell;
-	RhythmDB *db;
 	RBPlaylistManager *playlist_manager;
-	gboolean valid;
 
 	g_object_get (ui->priv->source, "shell", &shell, NULL);
-	g_object_get (shell, "db", &db, "playlist-manager", &playlist_manager, NULL);
+	g_object_get (shell, "playlist-manager", &playlist_manager, NULL);
 
 	/* tree_store columns are: active, inconsistent, name, display-name, is-category, category name */
 	ui->priv->sync_tree_store = gtk_tree_store_new (6, G_TYPE_BOOLEAN, G_TYPE_BOOLEAN, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_BOOLEAN, G_TYPE_STRING);
@@ -253,54 +249,6 @@ impl_constructed (GObject *object)
 		g_free (name);
 	}
 
-	/* Append the Podcasts parent */
-	gtk_tree_store_append (ui->priv->sync_tree_store,
-			       &parent_iter,
-			       NULL);
-	gtk_tree_store_set (ui->priv->sync_tree_store, &parent_iter,
-			    0, rb_sync_settings_sync_category (ui->priv->sync_settings, SYNC_CATEGORY_PODCAST),
-			    1, rb_sync_settings_has_enabled_groups (ui->priv->sync_settings, SYNC_CATEGORY_PODCAST),
-			    2, _("Podcasts"),
-			    3, _("Podcasts"),
-			    4, TRUE,
-			    5, SYNC_CATEGORY_PODCAST,
-			    -1);
-
-	/* this really needs to use a live query model */
-	query_model = GTK_TREE_MODEL (rhythmdb_query_model_new_empty (db));
-	rhythmdb_query_model_set_sort_order (RHYTHMDB_QUERY_MODEL (query_model),
-					     (GCompareDataFunc) rhythmdb_query_model_title_sort_func,
-					     NULL, NULL, FALSE);
-	rhythmdb_do_full_query (db, RHYTHMDB_QUERY_RESULTS (query_model),
-				RHYTHMDB_QUERY_PROP_EQUALS,
-				RHYTHMDB_PROP_TYPE, RHYTHMDB_ENTRY_TYPE_PODCAST_FEED,
-				RHYTHMDB_QUERY_END);
-	valid = gtk_tree_model_get_iter_first (query_model, &tree_iter);
-	while (valid) {
-		RhythmDBEntry *entry;
-		GtkTreeIter tree_iter2;
-		const char *name;
-		const char *feed;
-
-		entry = rhythmdb_query_model_iter_to_entry (RHYTHMDB_QUERY_MODEL (query_model), &tree_iter);
-		gtk_tree_store_append (ui->priv->sync_tree_store, &tree_iter2, &parent_iter);
-
-		/* set up this row */
-		name = rhythmdb_entry_get_string (entry, RHYTHMDB_PROP_TITLE);
-		feed = rhythmdb_entry_get_string (entry, RHYTHMDB_PROP_LOCATION);
-		rb_debug ("adding feed %s (name %s)", feed, name);
-		gtk_tree_store_set (ui->priv->sync_tree_store, &tree_iter2,
-				    0, rb_sync_settings_sync_group (ui->priv->sync_settings, SYNC_CATEGORY_PODCAST, feed),
-				    1, FALSE,
-				    2, feed,
-				    3, name,
-				    4, FALSE,
-				    5, SYNC_CATEGORY_PODCAST,
-				    -1);
-
-		valid = gtk_tree_model_iter_next (query_model, &tree_iter);
-	}
-
 	/* Set up the treeview */
 	tree_view = gtk_tree_view_new ();
 	gtk_tree_view_set_headers_visible (GTK_TREE_VIEW (tree_view), FALSE);
@@ -332,7 +280,6 @@ impl_constructed (GObject *object)
 
 	g_object_unref (playlist_manager);
 	g_object_unref (shell);
-	g_object_unref (db);
 
 	gtk_widget_show_all (GTK_WIDGET (ui));
 

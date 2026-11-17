@@ -41,7 +41,6 @@
 #include "rhythmdb.h"
 #include "rhythmdb-tree.h"
 #include "rhythmdb-query-model.h"
-#include "rb-podcast-entry-types.h"
 
 static void
 set_true (RhythmDBEntry *entry, gboolean *b)
@@ -499,32 +498,6 @@ START_TEST (test_rhythmdb_thread_barrier)
 }
 END_TEST
 
-START_TEST (test_rhythmdb_podcast_upgrade)
-{
-	RhythmDBEntry *entry;
-	const char *mountpoint;
-
-	/* load db with old podcasts setups */
-	g_object_set (G_OBJECT (db), "name", TEST_DIR "/podcast-upgrade.xml", NULL);
-	set_waiting_signal (G_OBJECT (db), "load-complete");
-	rhythmdb_load (db);
-	wait_for_signal ();
-
-	entry = rhythmdb_entry_lookup_by_location (db, "file:///home/tester/Desktop/BBC%20Xtra/xtra_20080906-1226a.mp3");
-
-	ck_assert_msg (entry != NULL, "entry missing");
-	ck_assert_msg (rhythmdb_entry_get_entry_type (entry) == RHYTHMDB_ENTRY_TYPE_PODCAST_POST, "entry isn't a podcast");
-	mountpoint = rhythmdb_entry_get_string (entry, RHYTHMDB_PROP_MOUNTPOINT);
-
-	ck_assert_msg (mountpoint != NULL, "no mountpoint for podcast");
-	ck_assert_msg (strcmp (mountpoint, "http://downloads.bbc.co.uk/podcasts/worldservice/xtra/xtra_20080906-1226a.mp3") == 0, "wrong mountpoint for podcast");
-
-	entry = rhythmdb_entry_lookup_by_location (db, "http://downloads.bbc.co.uk/podcasts/worldservice/xtra/xtra_20080903-1217a.mp3");
-	ck_assert_msg (entry != NULL, "entry not upgraded");
-	ck_assert_msg (rhythmdb_entry_get_string (entry, RHYTHMDB_PROP_MOUNTPOINT) == NULL, "wrong mountpoint for podcast");
-}
-END_TEST
-
 START_TEST (test_rhythmdb_modify_after_delete)
 {
 	RhythmDBEntry *entry;
@@ -635,7 +608,6 @@ rhythmdb_suite (void)
 	tcase_add_test (tc_chain, test_rhythmdb_thread_barrier);
 
 	/* tests for breakable bug fixes */
-	tcase_add_test (tc_chain, test_rhythmdb_podcast_upgrade);
 	tcase_add_test (tc_chain, test_rhythmdb_modify_after_delete);
 	tcase_add_test (tc_chain, test_rhythmdb_commit_change_merging);
 

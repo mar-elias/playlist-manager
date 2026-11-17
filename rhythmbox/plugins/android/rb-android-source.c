@@ -586,12 +586,8 @@ impl_get_entries (RBMediaPlayerSource *source,
 {
 	RhythmDBQueryModel *model;
 	GtkTreeIter iter;
-	gboolean podcast;
 
-	/* we don't have anything else to distinguish podcasts from regular
-	 * tracks, so just use the genre.
-	 */
-	podcast = (g_str_equal (category, SYNC_CATEGORY_PODCAST));
+	(void) category;
 
 	g_object_get (source, "base-query-model", &model, NULL);
 	if (gtk_tree_model_get_iter_first (GTK_TREE_MODEL (model), &iter) == FALSE) {
@@ -601,12 +597,8 @@ impl_get_entries (RBMediaPlayerSource *source,
 
 	do {
 		RhythmDBEntry *entry;
-		const char *genre;
 		entry = rhythmdb_query_model_iter_to_entry (model, &iter);
-		genre = rhythmdb_entry_get_string (entry, RHYTHMDB_PROP_GENRE);
-		if (g_str_equal (genre, "Podcast") == podcast) {
-			_rb_media_player_source_add_to_map (map, entry);
-		}
+		_rb_media_player_source_add_to_map (map, entry);
 	} while (gtk_tree_model_iter_next (GTK_TREE_MODEL (model), &iter));
 
 	g_object_unref (model);

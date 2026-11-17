@@ -28,13 +28,13 @@
 
 /*
  * sync settings consist of categories and groups within those categories.
- * categories are things like music and podcasts, groups are things like
- * playlists and individual podcast feeds.  if sync for a category is enabled,
+ * categories are things like music, groups are things like
+ * playlists.  if sync for a category is enabled,
  * then all groups within the category will be synced.
  *
  * at some point we probably need to have more than just enabled/disabled settings
- * at all levels.. things like the number of episodes for a podcast feed to keep
- * on the device.
+ * at all levels.
+
  *
  * categories are stored as groups in the keyfile, where the keyfile group name
  * matches the category name.  if the category as a whole is enabled, the
@@ -350,8 +350,7 @@ impl_constructed (GObject *object)
 		g_error_free (error);
 
 		/* probably need a way to set defaults.. syncing nothing by default
-		 * is kind of boring.  used to default to syncing all music and all
-		 * podcasts.
+		 * is kind of boring.  used to default to syncing all music.
 		 */
 	}
 

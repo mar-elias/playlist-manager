@@ -9,3 +9,4 @@ b496406df64a77a4a7a24e9af13981a909413b20
 cd rhythmbox
 meson setup _build -Dprefix=$PWD/_install
 ninja -C _build
+./_build/shell/rhythmbox

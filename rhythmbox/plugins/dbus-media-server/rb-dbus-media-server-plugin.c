@@ -2388,7 +2388,7 @@ impl_activate (PeasActivatable *bplugin)
 	/* register root */
 	register_object (plugin, &root_vtable, container_iface, RB_MEDIASERVER2_ROOT, G_OBJECT (plugin), plugin->root_reg_id);
 
-	/* register fixed sources (library, podcasts, etc.) */
+	/* register fixed sources (library, etc.) */
 	g_object_get (shell, "library-source", &source, NULL);
 	source_data = register_source_container (plugin, source, RB_MEDIASERVER2_LIBRARY, RB_MEDIASERVER2_ROOT, FALSE);
 	register_property_container (plugin->connection, source_data, RHYTHMDB_PROP_ARTIST, _("Artists"));

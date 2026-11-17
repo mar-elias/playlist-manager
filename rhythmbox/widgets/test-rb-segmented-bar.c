@@ -36,12 +36,10 @@
 guint64 total_capacity = 100 * GB;
 
 guint64 music_size = 0;
-guint64 podcast_size = 40 * GB;
 guint64 other_size = 15 * GB;
 guint64 available_size = 0;
 
 gdouble music_fraction = 0.0;
-gdouble podcast_fraction = 0.0;
 gdouble other_fraction = 0.0;
 gdouble available_fraction = 0.0;
 
@@ -65,7 +63,6 @@ static void
 update_fractions (void)
 {
 	music_fraction = (double) music_size / (double) total_capacity;
-	podcast_fraction = (double) podcast_size / (double) total_capacity;
 	other_fraction = (double) other_size / (double) total_capacity;
 	available_fraction = (double) available_size / (double) total_capacity;
 }
@@ -107,9 +104,6 @@ update_segments (RBSyncBarData *data)
 					 data->music_segment,
 					 music_fraction);
 	rb_segmented_bar_update_segment (RB_SEGMENTED_BAR (data->widget),
-					 data->podcast_segment,
-					 podcast_fraction);
-	rb_segmented_bar_update_segment (RB_SEGMENTED_BAR (data->widget),
 					 data->other_segment,
 					 other_fraction);
 	rb_segmented_bar_update_segment (RB_SEGMENTED_BAR (data->widget),
@@ -133,14 +127,13 @@ int main (int argc, char **argv)
 	if (g_strcmp0 (argv [1], "--rtl") == 0)
 		gtk_widget_set_direction (GTK_WIDGET (bar), GTK_TEXT_DIR_RTL);
 
-	g_assert (music_size + podcast_size + other_size <= total_capacity);
-	available_size = (total_capacity - music_size - podcast_size - other_size);
+	g_assert (music_size + other_size <= total_capacity);
+	available_size = (total_capacity - music_size - other_size);
 	update_fractions ();
 
 	data->widget = GTK_WIDGET (bar);
 	data->capacity = total_capacity;
 	data->music_segment = rb_segmented_bar_add_segment (bar, "Music", music_fraction, 0.2 , 0.4 , 0.65, 1);
-	data->podcast_segment = rb_segmented_bar_add_segment (bar, "Podcast", podcast_fraction, 0.96, 0.47, 0   , 1);
 	data->other_segment = rb_segmented_bar_add_segment (bar, "Other", other_fraction, 0.45, 0.82, 0.08, 1);
 	data->free_segment = rb_segmented_bar_add_segment_default_color (bar, "Available", available_fraction);
 

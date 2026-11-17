@@ -32,8 +32,6 @@
 #include "rb-debug.h"
 
 #include "rhythmdb-query-model.h"
-#include "rb-podcast-manager.h"
-#include "rb-podcast-entry-types.h"
 #include "rb-playlist-manager.h"
 #include "rb-shell.h"
 
@@ -58,16 +56,6 @@ enum {
 static guint signals[LAST_SIGNAL] = { 0 };
 
 G_DEFINE_TYPE (RBSyncState, rb_sync_state, G_TYPE_OBJECT)
-
-static gboolean
-entry_is_undownloaded_podcast (RhythmDBEntry *entry)
-{
-	if (rhythmdb_entry_get_entry_type (entry) == RHYTHMDB_ENTRY_TYPE_PODCAST_POST) {
-		return (!rb_podcast_manager_entry_downloaded (entry));
-	}
-
-	return FALSE;
-}
 
 static guint64
 _sum_entry_size (GHashTable *entries)
@@ -175,11 +163,9 @@ hash_table_insert_from_tree_model_cb (GtkTreeModel *query_model,
 	RhythmDBEntry *entry;
 
 	entry = rhythmdb_query_model_iter_to_entry (RHYTHMDB_QUERY_MODEL (query_model), iter);
-	if (!entry_is_undownloaded_podcast (entry)) {
-		g_hash_table_insert (target,
-				     rb_sync_state_make_track_uuid (entry),
-				     rhythmdb_entry_ref (entry));
-	}
+	g_hash_table_insert (target,
+			     rb_sync_state_make_track_uuid (entry),
+			     rhythmdb_entry_ref (entry));
 
 	return FALSE;
 }
@@ -242,40 +228,6 @@ itinerary_insert_some_playlists (RBSyncState *state,
 	g_list_free (playlists);
 }
 
-static void
-itinerary_insert_some_podcasts (RBSyncState *state,
-				RhythmDB *db,
-				GHashTable *target)
-{
-	GList *podcasts;
-	GList *i;
-
-	podcasts = rb_sync_settings_get_enabled_groups (state->priv->sync_settings, SYNC_CATEGORY_PODCAST);
-	for (i = podcasts; i != NULL; i = i->next) {
-		GtkTreeModel *query_model;
-		rb_debug ("adding entries from podcast %s to itinerary", (char *)i->data);
-		query_model = GTK_TREE_MODEL (rhythmdb_query_model_new_empty (db));
-		rhythmdb_do_full_query (db, RHYTHMDB_QUERY_RESULTS (query_model),
-					RHYTHMDB_QUERY_PROP_EQUALS,
-					RHYTHMDB_PROP_TYPE, RHYTHMDB_ENTRY_TYPE_PODCAST_POST,
-					RHYTHMDB_QUERY_PROP_EQUALS,
-					RHYTHMDB_PROP_SUBTITLE, i->data,
-					RHYTHMDB_QUERY_END);
-
-		/* TODO: exclude undownloaded episodes, sort by post date, set limit, optionally exclude things with play count > 0
-		 * RHYTHMDB_QUERY_PROP_NOT_EQUAL, RHYTHMDB_PROP_MOUNTPOINT, NULL,	(will this work?)
-		 * RHYTHMDB_QUERY_PROP_NOT_EQUAL, RHYTHMDB_PROP_STATUS, RHYTHMDB_PODCAST_STATUS_ERROR,
-		 *
-		 * RHYTHMDB_QUERY_PROP_EQUALS, RHYTHMDB_PROP_PLAYCOUNT, 0
-		 */
-
-		gtk_tree_model_foreach (query_model,
-					(GtkTreeModelForeachFunc) hash_table_insert_from_tree_model_cb,
-					target);
-		g_object_unref (query_model);
-	}
-}
-
 static GHashTable *
 build_sync_itinerary (RBSyncState *state)
 {
@@ -303,20 +255,6 @@ build_sync_itinerary (RBSyncState *state)
 	}
 
 	state->sync_music_size = _sum_entry_size (itinerary);
-
-	if (rb_sync_settings_sync_category (state->priv->sync_settings, SYNC_CATEGORY_PODCAST)) {
-		rb_debug ("adding all podcasts to the itinerary");
-		/* TODO: when we get #episodes/not-if-played settings, use
-		 * equivalent of insert_some_podcasts, iterating through all feeds
-		 * (use a query for all entries of type PODCAST_FEED to find them)
-		 */
-		itinerary_insert_all_of_type (db, RHYTHMDB_ENTRY_TYPE_PODCAST_POST, itinerary);
-	} else if (rb_sync_settings_has_enabled_groups (state->priv->sync_settings, SYNC_CATEGORY_PODCAST)) {
-		rb_debug ("adding selected podcasts to the itinerary");
-		itinerary_insert_some_podcasts (state, db, itinerary);
-	}
-
-	state->sync_podcast_size = _sum_entry_size (itinerary) - state->sync_music_size;
 
 	g_object_unref (shell);
 	g_object_unref (db);
@@ -347,18 +285,6 @@ build_device_state (RBSyncState *state)
 	}
 	g_hash_table_destroy (entries);
 	rb_debug ("done getting music entries from device");
-
-	rb_debug ("getting podcast entries from device");
-	entries = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, (GDestroyNotify) rhythmdb_entry_unref);
-	rb_media_player_source_get_entries (state->priv->source, SYNC_CATEGORY_PODCAST, entries);
-	/*klass->impl_get_entries (source, SYNC_CATEGORY_PODCAST, entries);*/
-	state->total_podcast_size = _sum_entry_size (entries);
-	if (rb_sync_settings_sync_category (state->priv->sync_settings, SYNC_CATEGORY_PODCAST) ||
-	    rb_sync_settings_has_enabled_groups (state->priv->sync_settings, SYNC_CATEGORY_PODCAST)) {
-		_g_hash_table_transfer_all (device, entries);
-	}
-	g_hash_table_destroy (entries);
-	rb_debug ("done getting podcast entries from device");
 
 	rb_debug ("done building device contents hash; has %d entries", g_hash_table_size (device));
 	return device;

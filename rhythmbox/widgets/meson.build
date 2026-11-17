@@ -58,7 +58,7 @@ widgets_dependencies = [gtk, gdk_pixbuf, cairo, pango, gstreamer_pbutils, libsou
 rbwidgets_lib = static_library('rbwidgets',
   widgets_sources,
   dependencies: widgets_dependencies + [librb_dep, rhythmdb_dep, rbmetadata_dep,
-  rbbackends_dep, rbpodcast_dep, sources_dep],
+  rbbackends_dep, sources_dep],
   include_directories: [pluginsinc, shellinc, widgetsinc])
 
 rbwidgets_dep = declare_dependency(

@@ -1211,12 +1211,8 @@ impl_get_entries (RBMediaPlayerSource *source,
 {
 	RhythmDBQueryModel *model;
 	GtkTreeIter iter;
-	gboolean podcast;
 
-	/* we don't have anything else to distinguish podcasts from regular
-	 * tracks, so just use the genre.
-	 */
-	podcast = (g_str_equal (category, SYNC_CATEGORY_PODCAST));
+	(void) category;
 
 	g_object_get (source, "base-query-model", &model, NULL);
 	if (gtk_tree_model_get_iter_first (GTK_TREE_MODEL (model), &iter) == FALSE) {
@@ -1226,12 +1222,8 @@ impl_get_entries (RBMediaPlayerSource *source,
 
 	do {
 		RhythmDBEntry *entry;
-		const char *genre;
 		entry = rhythmdb_query_model_iter_to_entry (model, &iter);
-		genre = rhythmdb_entry_get_string (entry, RHYTHMDB_PROP_GENRE);
-		if (g_str_equal (genre, "Podcast") == podcast) {
-			_rb_media_player_source_add_to_map (map, entry);
-		}
+		_rb_media_player_source_add_to_map (map, entry);
 	} while (gtk_tree_model_iter_next (GTK_TREE_MODEL (model), &iter));
 
 	g_object_unref (model);
@@ -1347,10 +1339,6 @@ impl_show_properties (RBMediaPlayerSource *source, GtkWidget *info_box, GtkWidge
 	g_object_get (source, "name", &device_name, NULL);
 	gtk_entry_set_text (GTK_ENTRY (widget), device_name);
 	g_free (device_name);
-	/* don't think we can support this..
-	g_signal_connect (widget, "focus-out-event",
-			  (GCallback)rb_mtp_source_name_changed_cb, source);
-			  */
 
 	g_object_get (source, "base-query-model", &model, NULL);
 	widget = GTK_WIDGET (gtk_builder_get_object (builder, "num-tracks"));

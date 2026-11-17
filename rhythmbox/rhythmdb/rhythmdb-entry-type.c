@@ -78,7 +78,7 @@ G_DEFINE_TYPE (RhythmDBEntryType, rhythmdb_entry_type, G_TYPE_OBJECT)
  *
  * This is the base class for database entry type classes, which provide
  * some aspects of the behaviour of database entry types.  There are different
- * entry types for songs, radio streams, podcast feeds and episodes, and so on.
+ * entry types for songs, radio streams, and so on.
  *
  * Plugins written in Python or Vala can create new entry types by subclassing
  * and overriding any methods required.  Plugins written in C can create a new
@@ -631,7 +631,7 @@ rhythmdb_entry_type_class_init (RhythmDBEntryTypeClass *klass)
  * RhythmDBEntryCategory:
  * @RHYTHMDB_ENTRY_NORMAL: Normal files on disk
  * @RHYTHMDB_ENTRY_STREAM: Endless streams (eg shoutcast)
- * @RHYTHMDB_ENTRY_CONTAINER: Containers for other entries (eg podcast feeds)
+ * @RHYTHMDB_ENTRY_CONTAINER: Containers for other entries
  * @RHYTHMDB_ENTRY_VIRTUAL: Things Rhythmbox shouldn't normally deal with
  *
  * Categories used to group entry types.  These are used in a few places to control
