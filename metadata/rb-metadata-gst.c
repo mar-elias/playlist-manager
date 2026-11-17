@@ -161,6 +161,32 @@ run_typefind (RBMetaData *md, const char *uri)
 	}
 }
 
+static gboolean
+uri_has_mp4_extension (const char *uri)
+{
+	const char *base;
+	gsize len;
+
+	if (uri == NULL)
+		return FALSE;
+
+	base = strrchr (uri, '/');
+	base = (base != NULL) ? base + 1 : uri;
+	len = strlen (base);
+	return (len >= 4 && g_ascii_strcasecmp (base + len - 4, ".mp4") == 0);
+}
+
+static gboolean
+media_type_is_mp4 (const char *media_type)
+{
+	return (g_strcmp0 (media_type, "video/quicktime") == 0 ||
+		g_strcmp0 (media_type, "video/mp4") == 0 ||
+		g_strcmp0 (media_type, "audio/mp4") == 0 ||
+		g_strcmp0 (media_type, "audio/x-m4a") == 0 ||
+		g_strcmp0 (media_type, "audio/m4a") == 0 ||
+		g_strcmp0 (media_type, "application/mp4") == 0);
+}
+
 void
 rb_metadata_load (RBMetaData *md, const char *uri, GError **error)
 {
@@ -169,8 +195,10 @@ rb_metadata_load (RBMetaData *md, const char *uri, GError **error)
 	GstDiscoverer *discoverer;
 	GstCaps *caps;
 	GError *gsterror = NULL;
+	gboolean mp4;
 
 	rb_metadata_reset (md);
+	mp4 = uri_has_mp4_extension (uri);
 
 	discoverer = gst_discoverer_new (30 * GST_SECOND, error);
 	if (*error != NULL)
@@ -179,13 +207,26 @@ rb_metadata_load (RBMetaData *md, const char *uri, GError **error)
 	md->priv->info = gst_discoverer_discover_uri (discoverer, g_strdup (uri), &gsterror);
 	g_object_unref (discoverer);
 
+	if (md->priv->info == NULL) {
+		if (mp4)
+			g_clear_error (&gsterror);
+		goto done;
+	}
+
 	/* figure out if we've got audio, non-audio, or video streams */
 	streams = gst_discoverer_info_get_streams (md->priv->info, GST_TYPE_DISCOVERER_STREAM_INFO);
 	for (l = streams; l != NULL; l = l->next) {
 		GstDiscovererStreamInfo *s = (GstDiscovererStreamInfo *)l->data;
 		const char *mediatype;
 		caps = gst_discoverer_stream_info_get_caps (s);
+		if (caps == NULL || gst_caps_get_size (caps) == 0) {
+			if (caps != NULL)
+				gst_caps_unref (caps);
+			continue;
+		}
 		mediatype = gst_structure_get_name (gst_caps_get_structure (caps, 0));
+		if (media_type_is_mp4 (mediatype))
+			mp4 = TRUE;
 
 		if (GST_IS_DISCOVERER_AUDIO_INFO (s)) {
 			md->priv->has_audio = TRUE;
@@ -232,6 +273,8 @@ rb_metadata_load (RBMetaData *md, const char *uri, GError **error)
 	if (md->priv->mediatype == NULL) {
 		run_typefind (md, uri);
 	}
+	if (media_type_is_mp4 (md->priv->mediatype))
+		mp4 = TRUE;
 
 	/* look at missing plugin information too */
 	switch (rb_gst_get_missing_plugin_type (gst_discoverer_info_get_misc (md->priv->info))) {
@@ -255,6 +298,16 @@ rb_metadata_load (RBMetaData *md, const char *uri, GError **error)
 		g_assert_not_reached ();
 	}
 
+	/*
+	 * MP4 files are imported even when they contain a video stream or a
+	 * video decoder is missing.  Playback uses the audio track.
+	 */
+	if (mp4) {
+		md->priv->has_video = FALSE;
+		g_clear_error (&gsterror);
+	}
+
+done:
 	if (gsterror != NULL) {
 		int code = RB_METADATA_ERROR_GENERAL;
 		if (g_error_matches (gsterror, GST_STREAM_ERROR, GST_STREAM_ERROR_TYPE_NOT_FOUND)) {

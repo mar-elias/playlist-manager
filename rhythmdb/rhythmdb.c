@@ -805,6 +805,32 @@ rhythmdb_ignore_media_type (const char *media_type)
 	return FALSE;
 }
 
+static gboolean
+rhythmdb_uri_is_mp4 (const char *uri)
+{
+	const char *base;
+	gsize len;
+
+	if (uri == NULL)
+		return FALSE;
+
+	base = strrchr (uri, '/');
+	base = (base != NULL) ? base + 1 : uri;
+	len = strlen (base);
+	return (len >= 4 && g_ascii_strcasecmp (base + len - 4, ".mp4") == 0);
+}
+
+static gboolean
+rhythmdb_media_type_is_mp4 (const char *media_type)
+{
+	return (g_strcmp0 (media_type, "video/quicktime") == 0 ||
+		g_strcmp0 (media_type, "video/mp4") == 0 ||
+		g_strcmp0 (media_type, "audio/mp4") == 0 ||
+		g_strcmp0 (media_type, "audio/x-m4a") == 0 ||
+		g_strcmp0 (media_type, "audio/m4a") == 0 ||
+		g_strcmp0 (media_type, "application/mp4") == 0);
+}
+
 typedef struct {
 	RhythmDB *db;
 	GList *stat_list;
@@ -2218,7 +2244,9 @@ rhythmdb_process_stat_event (RhythmDB *db,
 			 */
 			new_mtime = g_file_info_get_attribute_uint64 (event->file_info, G_FILE_ATTRIBUTE_TIME_MODIFIED);
 			new_size = g_file_info_get_attribute_uint64 (event->file_info, G_FILE_ATTRIBUTE_STANDARD_SIZE);
-			if (entry->mtime == new_mtime && (new_size == 0 || entry->file_size == new_size)) {
+			if (entry->mtime == new_mtime && (new_size == 0 || entry->file_size == new_size) &&
+			    !((entry->type == event->ignore_type || entry->type == event->error_type) &&
+			      rhythmdb_uri_is_mp4 (rb_refstring_get (event->real_uri)))) {
 				rb_debug ("not modified: %s", rb_refstring_get (event->real_uri));
 			} else {
 				rb_debug ("changed: %s", rb_refstring_get (event->real_uri));
@@ -2507,15 +2535,23 @@ rhythmdb_process_metadata_load (RhythmDB *db, RhythmDBEvent *event)
 	RhythmDBEntry *entry;
 	GTimeVal time;
 	gboolean monitor;
+	const char *media_type;
+	gboolean is_mp4;
 
 	entry = NULL;
+	media_type = NULL;
+	is_mp4 = rhythmdb_uri_is_mp4 (rb_refstring_get (event->real_uri));
 
 	if (event->entry_type == NULL)
 		event->entry_type = RHYTHMDB_ENTRY_TYPE_SONG;
 
 	if (event->metadata != NULL) {
-		/* always ignore anything with video in it */
-		if (rb_metadata_has_video (event->metadata)) {
+		media_type = rb_metadata_get_media_type (event->metadata);
+		if (rhythmdb_media_type_is_mp4 (media_type))
+			is_mp4 = TRUE;
+
+		/* ignore video files. mp4 files are kept, video track and all. */
+		if (is_mp4 == FALSE && rb_metadata_has_video (event->metadata)) {
 			entry = rhythmdb_add_import_error_entry (db, event, event->ignore_type);
 		}
 
@@ -2523,10 +2559,9 @@ rhythmdb_process_metadata_load (RhythmDB *db, RhythmDBEvent *event)
 		 * that matches one of the media types we don't care about,
 		 * as well as anything that doesn't contain audio.
 		 */
-		const char *media_type = rb_metadata_get_media_type (event->metadata);
 		if (entry == NULL && media_type != NULL && media_type[0] != '\0') {
 			if (rhythmdb_ignore_media_type (media_type) ||
-			    rb_metadata_has_audio (event->metadata) == FALSE) {
+			    (is_mp4 == FALSE && rb_metadata_has_audio (event->metadata) == FALSE)) {
 				entry = rhythmdb_add_import_error_entry (db, event, event->ignore_type);
 			}
 		}

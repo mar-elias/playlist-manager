@@ -195,7 +195,6 @@ msgfmt_plugin_cmd = [
 plugins = [
   'audiocd',
   'audioscrobbler',
-  'dbus-media-server',
   'generic-player',
   'mpris',
   'power-manager'
