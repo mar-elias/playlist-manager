@@ -2899,8 +2899,8 @@ load_uri_parser_finished_cb (GObject *parser, GAsyncResult *res, PlaylistParseDa
  * @play: if TRUE, start playing the URI (if possible)
  * @error: returns error information
  *
- * Loads a URI representing a single song, a directory, a playlist, or
- * an internet radio station, and optionally starts playing it.
+ * Loads a URI representing a single song, a directory, or a playlist,
+ * and optionally starts playing it.
  *
  * For playlists containing only stream URLs, we either add the playlist
  * itself (if it's remote) or each URL from it (if it's local).  The main

@@ -30,14 +30,12 @@
 
 #include <glib/gi18n.h>
 #include <gtk/gtk.h>
-#include <json-glib/json-glib.h>
 #include <math.h>
 
 #include <lib/rb-debug.h>
 #include <lib/rb-builder-helpers.h>
 #include <lib/rb-file-helpers.h>
 #include <lib/rb-util.h>
-#include <sources/rb-display-page-tree.h>
 #include <sources/rb-display-page-group.h>
 #include <widgets/eggwrapbox.h>
 #include <widgets/rb-source-toolbar.h>
@@ -46,8 +44,6 @@
 #include "rb-audioscrobbler.h"
 #include "rb-audioscrobbler-account.h"
 #include "rb-audioscrobbler-user.h"
-#include "rb-audioscrobbler-radio-source.h"
-#include "rb-audioscrobbler-radio-track-entry-type.h"
 
 
 struct _RBAudioscrobblerProfilePagePrivate {
@@ -59,9 +55,6 @@ struct _RBAudioscrobblerProfilePagePrivate {
 	/* Used to request the user's profile data */
 	RBAudioscrobblerUser *user;
 	guint update_timeout_id;
-
-	/* List of radio stations owned by this page */
-	GList *radio_sources;
 
 	guint scrobbling_enabled_notification_id;
 
@@ -89,10 +82,6 @@ struct _RBAudioscrobblerProfilePagePrivate {
 	GtkWidget *scrobbler_submit_count_label;
 	GtkWidget *scrobbler_submit_time_label;
 
-	/* Station creation UI */
-	GtkWidget *station_creator_type_combo;
-	GtkWidget *station_creator_arg_entry;
-
 	/* Profile data lists */
 	GtkWidget *recent_tracks_area;
 	GtkWidget *recent_tracks_wrap_box;
@@ -109,7 +98,6 @@ struct _RBAudioscrobblerProfilePagePrivate {
 	GMenu *toolbar_menu;
 	GSimpleAction *love_action;
 	GSimpleAction *ban_action;
-	GSimpleAction *download_action;
 };
 
 
@@ -163,20 +151,7 @@ static void update_service_actions_sensitivity (RBAudioscrobblerProfilePage *pag
 
 static void love_track_action_cb (GSimpleAction *, GVariant *, gpointer);
 static void ban_track_action_cb (GSimpleAction *, GVariant *, gpointer);
-static void download_track_action_cb (GSimpleAction *, GVariant *, gpointer);
 static void refresh_profile_action_cb (GSimpleAction *, GVariant *, gpointer);
-static void download_track_batch_complete_cb (RBTrackTransferBatch *batch, RBAudioscrobblerProfilePage *page);
-
-/* radio station creation/deletion */
-static void station_creator_button_clicked_cb (GtkButton *button, RBAudioscrobblerProfilePage *page);
-static void load_radio_stations (RBAudioscrobblerProfilePage *page);
-static void save_radio_stations (RBAudioscrobblerProfilePage *page);
-static RBSource *add_radio_station (RBAudioscrobblerProfilePage *page,
-                                    const char *url,
-                                    const char *name);
-static void radio_station_name_changed_cb (RBAudioscrobblerRadioSource *radio,
-                                           GParamSpec *spec,
-                                           RBAudioscrobblerProfilePage *page);
 
 /* periodically attempts tp update the profile data */
 static gboolean update_timeout_cb (RBAudioscrobblerProfilePage *page);
@@ -212,10 +187,6 @@ static GtkWidget *create_popup_menu (RBAudioscrobblerProfilePage *page,
 static void list_item_clicked_cb (GtkButton *button, RBAudioscrobblerProfilePage *page);
 static void list_item_view_url_activated_cb (GtkMenuItem *menuitem,
                                              RBAudioscrobblerProfilePage *page);
-static void list_item_listen_similar_artists_activated_cb (GtkMenuItem *menuitem,
-                                                           RBAudioscrobblerProfilePage *page);
-static void list_item_listen_top_fans_activated_cb (GtkMenuItem *menuitem,
-                                                    RBAudioscrobblerProfilePage *page);
 
 /* RBDisplayPage implementations */
 static void impl_selected (RBDisplayPage *page);
@@ -517,9 +488,7 @@ init_profile_ui (RBAudioscrobblerProfilePage *page)
 	GObject *plugin;
 	char *builder_file;
 	GtkBuilder *builder;
-	GtkWidget *combo_container;
 	GtkWidget *w;
-	int i;
 
 	g_object_get (page, "plugin", &plugin, NULL);
 
@@ -545,20 +514,6 @@ init_profile_ui (RBAudioscrobblerProfilePage *page)
 	page->priv->scrobbler_queue_count_label = GTK_WIDGET (gtk_builder_get_object (builder, "scrobbler_queue_count_label"));
 	page->priv->scrobbler_submit_count_label = GTK_WIDGET (gtk_builder_get_object (builder, "scrobbler_submit_count_label"));
 	page->priv->scrobbler_submit_time_label = GTK_WIDGET (gtk_builder_get_object (builder, "scrobbler_submit_time_label"));
-
-	/* station creator */
-	w = GTK_WIDGET (gtk_builder_get_object (builder, "station_creator_button"));
-	g_signal_connect (w, "clicked", G_CALLBACK (station_creator_button_clicked_cb), page);
-	page->priv->station_creator_arg_entry = GTK_WIDGET (gtk_builder_get_object (builder, "station_creator_arg_entry"));
-	combo_container = GTK_WIDGET (gtk_builder_get_object (builder, "station_creator_combo_container"));
-	page->priv->station_creator_type_combo = gtk_combo_box_text_new ();
-	gtk_container_add (GTK_CONTAINER (combo_container), page->priv->station_creator_type_combo);
-	for (i = 0; i < RB_AUDIOSCROBBLER_RADIO_TYPE_LAST; i++) {
-		gtk_combo_box_text_append_text (GTK_COMBO_BOX_TEXT (page->priv->station_creator_type_combo),
-						rb_audioscrobbler_radio_type_get_text (i));
-	}
-	gtk_combo_box_set_active (GTK_COMBO_BOX (page->priv->station_creator_type_combo), 0);
-	gtk_widget_show (page->priv->station_creator_type_combo);
 
 	/* lists of data */
 	page->priv->recent_tracks_area = GTK_WIDGET (gtk_builder_get_object (builder, "recent_tracks_area"));
@@ -623,7 +578,6 @@ init_actions (RBAudioscrobblerProfilePage *page)
 	GActionEntry service_actions[] = {
 		{ "audioscrobbler-%s-love-track", love_track_action_cb },
 		{ "audioscrobbler-%s-ban-track", ban_track_action_cb },
-		{ "audioscrobbler-%s-download-track", download_track_action_cb },
 	};
 
 	g_object_get (page, "shell", &shell, "plugin", &plugin, NULL);
@@ -648,7 +602,6 @@ init_actions (RBAudioscrobblerProfilePage *page)
 
 	page->priv->love_action = G_SIMPLE_ACTION (g_action_map_lookup_action (map, service_actions[0].name));
 	page->priv->ban_action = G_SIMPLE_ACTION (g_action_map_lookup_action (map, service_actions[1].name));
-	page->priv->download_action = G_SIMPLE_ACTION (g_action_map_lookup_action (map, service_actions[2].name));
 	/* ugh leaks
 	for (i = 0; i < G_N_ELEMENTS (service_actions); i++) {
 		g_free (service_actions[i].name);
@@ -671,10 +624,6 @@ init_actions (RBAudioscrobblerProfilePage *page)
 
 	action_name = g_strdup_printf ("app.audioscrobbler-%s-ban-track", rb_audioscrobbler_service_get_name (page->priv->service));
 	g_menu_append (page->priv->toolbar_menu, _("Ban"), action_name);
-	g_free (action_name);
-
-	action_name = g_strdup_printf ("app.audioscrobbler-%s-download-track", rb_audioscrobbler_service_get_name (page->priv->service));
-	g_menu_append (page->priv->toolbar_menu, _("Download"), action_name);
 	g_free (action_name);
 
 	page->priv->toolbar = rb_source_toolbar_new (RB_DISPLAY_PAGE (page), accel_group);
@@ -764,8 +713,6 @@ login_status_change_cb (RBAudioscrobblerAccount *account,
 	if (username != NULL) {
 		rb_audioscrobbler_user_update (page->priv->user);
 	}
-
-	load_radio_stations (page);
 
 	/* update the login ui */
 	switch (status) {
@@ -931,21 +878,6 @@ update_service_actions_sensitivity (RBAudioscrobblerProfilePage *page, RhythmDBE
 		g_simple_action_set_enabled (page->priv->love_action, TRUE);
 		g_simple_action_set_enabled (page->priv->ban_action, TRUE);
 	}
-
-	/* enable download if the playing entry is a radio track from this service which provides a download url */
-	if (entry != NULL &&
-	    rhythmdb_entry_get_entry_type (entry) == RHYTHMDB_ENTRY_TYPE_AUDIOSCROBBLER_RADIO_TRACK) {
-		RBAudioscrobblerRadioTrackData *data;
-		data = RHYTHMDB_ENTRY_GET_TYPE_DATA (entry, RBAudioscrobblerRadioTrackData);
-
-		if (data->service == page->priv->service && data->download_url != NULL) {
-			g_simple_action_set_enabled (page->priv->download_action, TRUE);
-		} else {
-			g_simple_action_set_enabled (page->priv->download_action, FALSE);
-		}
-	} else {
-		g_simple_action_set_enabled (page->priv->download_action, FALSE);
-	}
 }
 
 static void
@@ -1000,374 +932,10 @@ ban_track_action_cb (GSimpleAction *action, GVariant *parameters, gpointer data)
 }
 
 static void
-download_track_action_cb (GSimpleAction *action, GVariant *parameters, gpointer data)
-{
-	RBAudioscrobblerProfilePage *page = RB_AUDIOSCROBBLER_PROFILE_PAGE (data);
-	RBShell *shell;
-	RBShellPlayer *shell_player;
-	RhythmDBEntry *playing;
-
-	g_simple_action_set_enabled (action, FALSE);
-
-	g_object_get (page, "shell", &shell, NULL);
-	g_object_get (shell, "shell-player", &shell_player, NULL);
-	playing = rb_shell_player_get_playing_entry (shell_player);
-
-	if (playing != NULL &&
-	    rhythmdb_entry_get_entry_type (playing) == RHYTHMDB_ENTRY_TYPE_AUDIOSCROBBLER_RADIO_TRACK) {
-		RBAudioscrobblerRadioTrackData *data;
-		data = RHYTHMDB_ENTRY_GET_TYPE_DATA (playing, RBAudioscrobblerRadioTrackData);
-
-		if (data->download_url != NULL) {
-			RhythmDB *db;
-			RBSource *library;
-			RhythmDBEntry *download;
-			GValue val = { 0, };
-			RBTrackTransferBatch *batch;
-
-			/* we need the library source to paste into */
-			g_object_get (shell, "db", &db, "library-source", &library, NULL);
-
-			/* create a new entry to paste */
-			download = rhythmdb_entry_new (db,
-			                               RHYTHMDB_ENTRY_TYPE_AUDIOSCROBBLER_RADIO_TRACK, /* not really, but it needs a type */
-			                               data->download_url);
-
-			g_value_init (&val, G_TYPE_STRING);
-			g_value_set_string (&val, rhythmdb_entry_get_string (playing, RHYTHMDB_PROP_TITLE));
-			rhythmdb_entry_set (db, download, RHYTHMDB_PROP_TITLE, &val);
-			g_value_unset (&val);
-			g_value_init (&val, G_TYPE_STRING);
-			g_value_set_string (&val, rhythmdb_entry_get_string (playing, RHYTHMDB_PROP_ARTIST));
-			rhythmdb_entry_set (db, download, RHYTHMDB_PROP_ARTIST, &val);
-			g_value_unset (&val);
-			g_value_init (&val, G_TYPE_STRING);
-			g_value_set_string (&val, rhythmdb_entry_get_string (playing, RHYTHMDB_PROP_ALBUM));
-			rhythmdb_entry_set (db, download, RHYTHMDB_PROP_ALBUM, &val);
-			g_value_unset (&val);
-
-			rb_debug ("downloading track from %s", data->download_url);
-			batch = rb_source_paste (library, g_list_append (NULL, download));
-
-			if (batch == NULL) {
-				/* delete the entry we just created */
-				rhythmdb_entry_delete (db, download);
-				rhythmdb_entry_unref (download);
-			} else {
-				/* connect a callback to delete the entry when transfer is done */
-				g_signal_connect_object (batch,
-				                         "complete",
-				                         G_CALLBACK (download_track_batch_complete_cb),
-				                         page,
-				                         0);
-			}
-
-			g_object_unref (db);
-			g_object_unref (library);
-		} else {
-			rb_debug ("cannot download: no download url");
-		}
-		rhythmdb_entry_unref (playing);
-	} else {
-		rb_debug ("cannot download: playing entry is not an audioscrobbler radio track");
-	}
-
-	g_object_unref (shell_player);
-	g_object_unref (shell);
-}
-
-static void
-download_track_batch_complete_cb (RBTrackTransferBatch *batch,
-                                  RBAudioscrobblerProfilePage *page)
-{
-	GList *entries;
-	RBShell *shell;
-	RhythmDB *db;
-	GList *i;
-
-	g_object_get (batch, "entry-list", &entries, NULL);
-	g_object_get (page, "shell", &shell, NULL);
-	g_object_get (shell, "db", &db, NULL);
-
-	/* delete the entries which were transfered.
-	 * need to call unref twice as g_object_get will have reffed them
-	 */
-	for (i = entries; i != NULL; i = i->next) {
-		rhythmdb_entry_delete (db, i->data);
-		rhythmdb_entry_unref (i->data);
-		rhythmdb_entry_unref (i->data);
-	}
-
-	g_list_free (entries);
-	g_object_unref (shell);
-	g_object_unref (db);
-}
-
-static void
 refresh_profile_action_cb (GSimpleAction *action, GVariant *parameters, gpointer data)
 {
 	RBAudioscrobblerProfilePage *page = RB_AUDIOSCROBBLER_PROFILE_PAGE (data);
 	rb_audioscrobbler_user_force_update (page->priv->user);
-}
-
-static void
-station_creator_button_clicked_cb (GtkButton *button,
-                                   RBAudioscrobblerProfilePage *page)
-{
-	const char *arg;
-
-	arg = gtk_entry_get_text (GTK_ENTRY (page->priv->station_creator_arg_entry));
-
-	if (arg[0] != '\0') {
-		RBAudioscrobblerRadioType type;
-		char *url;
-		char *name;
-		RBSource *radio;
-		RBShell *shell;
-		RBDisplayPageTree *page_tree;
-
-		type = gtk_combo_box_get_active (GTK_COMBO_BOX (page->priv->station_creator_type_combo));
-
-		url = g_strdup_printf (rb_audioscrobbler_radio_type_get_url (type),
-		                       arg);
-		name = g_strdup_printf (rb_audioscrobbler_radio_type_get_default_name (type),
-		                        arg);
-
-		radio = add_radio_station (page, url, name);
-		g_object_get (page, "shell", &shell, NULL);
-		g_object_get (shell, "display-page-tree", &page_tree, NULL);
-		rb_display_page_tree_select (page_tree, RB_DISPLAY_PAGE (radio));
-
-		gtk_entry_set_text (GTK_ENTRY (page->priv->station_creator_arg_entry), "");
-
-		g_free (url);
-		g_free (name);
-		g_object_unref (shell);
-		g_object_unref (page_tree);
-	}
-}
-
-/* delete old user's radio sources and load ones for new user */
-static void
-load_radio_stations (RBAudioscrobblerProfilePage *page)
-{
-	/* destroy existing sources */
-	while (page->priv->radio_sources != NULL) {
-		rb_display_page_delete_thyself (RB_DISPLAY_PAGE (page->priv->radio_sources->data));
-		page->priv->radio_sources = g_list_remove (page->priv->radio_sources, page->priv->radio_sources->data);
-	}
-
-	/* load the user's saved stations */
-	if (rb_audioscrobbler_account_get_username (page->priv->account) != NULL) {
-		JsonParser *parser;
-		char *filename;
-
-		parser = json_parser_new ();
-		filename = g_build_filename (rb_user_data_dir (),
-		                             "audioscrobbler",
-		                             "stations",
-		                             rb_audioscrobbler_service_get_name (page->priv->service),
-		                             rb_audioscrobbler_account_get_username (page->priv->account),
-		                             NULL);
-
-		if (json_parser_load_from_file (parser, filename, NULL)) {
-			JsonArray *stations;
-			int i;
-
-			stations = json_node_get_array (json_parser_get_root (parser));
-
-			for (i = 0; i < json_array_get_length (stations); i++) {
-				JsonObject *station;
-				const char *name;
-				const char *url;
-				RBSource *radio;
-
-				station = json_array_get_object_element (stations, i);
-				name = json_object_get_string_member (station, "name");
-				url = json_object_get_string_member (station, "url");
-
-				radio = rb_audioscrobbler_radio_source_new (page,
-				                                            page->priv->service,
-				                                            rb_audioscrobbler_account_get_username (page->priv->account),
-				                                            rb_audioscrobbler_account_get_session_key (page->priv->account),
-				                                            name,
-				                                            url);
-				page->priv->radio_sources = g_list_append (page->priv->radio_sources, radio);
-				g_signal_connect (radio, "notify::name",
-						  G_CALLBACK (radio_station_name_changed_cb),
-						  page);
-			}
-		}
-
-		/* if the list of stations is still empty then add some defaults */
-		if (page->priv->radio_sources == NULL) {
-			char *url;
-			char *name;
-
-			/* user's library */
-			url = g_strdup_printf (rb_audioscrobbler_radio_type_get_url (RB_AUDIOSCROBBLER_RADIO_TYPE_LIBRARY),
-			                       rb_audioscrobbler_account_get_username (page->priv->account));
-			name = g_strdup (_("My Library"));
-			add_radio_station (page, url, name);
-			g_free (url);
-			g_free (name);
-
-			/* user's recommendations */
-			url = g_strdup_printf (rb_audioscrobbler_radio_type_get_url (RB_AUDIOSCROBBLER_RADIO_TYPE_RECOMMENDATION),
-			                       rb_audioscrobbler_account_get_username (page->priv->account));
-			name = g_strdup (_("My Recommendations"));
-			add_radio_station (page, url, name);
-			g_free (url);
-			g_free (name);
-
-			/* user's neighbourhood */
-			url = g_strdup_printf (rb_audioscrobbler_radio_type_get_url (RB_AUDIOSCROBBLER_RADIO_TYPE_NEIGHBOURS),
-			                       rb_audioscrobbler_account_get_username (page->priv->account));
-			name = g_strdup (_("My Neighbourhood"));
-			add_radio_station (page, url, name);
-			g_free (url);
-			g_free (name);
-
-			/* rhythmbox group */
-			url = g_strdup_printf (rb_audioscrobbler_radio_type_get_url (RB_AUDIOSCROBBLER_RADIO_TYPE_GROUP),
-			                       "rhythmbox");
-			name = g_strdup_printf (rb_audioscrobbler_radio_type_get_default_name (RB_AUDIOSCROBBLER_RADIO_TYPE_GROUP),
-			                       "Rhythmbox");
-			add_radio_station (page, url, name);
-			g_free (url);
-			g_free (name);
-		}
-
-		g_object_unref (parser);
-		g_free (filename);
-	}
-}
-
-/* save user's radio stations */
-static void
-save_radio_stations (RBAudioscrobblerProfilePage *page)
-{
-	JsonNode *root;
-	JsonArray *stations;
-	GList *i;
-	JsonGenerator *generator;
-	char *filename;
-	char *uri;
-	GError *error;
-
-	root = json_node_new (JSON_NODE_ARRAY);
-	stations = json_array_new ();
-
-	for (i = page->priv->radio_sources; i != NULL; i = i->next) {
-		JsonObject *station;
-		char *name;
-		char *url;
-
-		g_object_get (i->data, "name", &name, "station-url", &url, NULL);
-		station = json_object_new ();
-		json_object_set_string_member (station, "name", name);
-		json_object_set_string_member (station, "url", url);
-		json_array_add_object_element (stations, station);
-
-		g_free (name);
-		g_free (url);
-	}
-
-	json_node_take_array (root, stations);
-
-	generator = json_generator_new ();
-	json_generator_set_root (generator, root);
-
-	filename = g_build_filename (rb_user_data_dir (),
-	                             "audioscrobbler",
-	                             "stations",
-	                             rb_audioscrobbler_service_get_name (page->priv->service),
-	                             rb_audioscrobbler_account_get_username (page->priv->account),
-	                             NULL);
-
-	uri = g_filename_to_uri (filename, NULL, NULL);
-	error = NULL;
-	rb_uri_create_parent_dirs (uri, &error);
-	json_generator_to_file (generator, filename, NULL);
-
-	json_node_free (root);
-	g_object_unref (generator);
-	g_free (filename);
-	g_free (uri);
-}
-
-/* adds a new radio station for the user, if it doesn't already exist */
-static RBSource *
-add_radio_station (RBAudioscrobblerProfilePage *page,
-                   const char *url,
-                   const char *name)
-{
-	GList *i;
-	RBSource *radio = NULL;
-
-	/* check for existing station */
-	for (i = page->priv->radio_sources; i != NULL; i = i->next) {
-		char *existing_url;
-		g_object_get (i->data, "station-url", &existing_url, NULL);
-
-		if (strcmp (existing_url, url) == 0) {
-			radio = i->data;
-		}
-
-		g_free (existing_url);
-	}
-
-	if (radio == NULL) {
-		const char *username;
-		const char *session_key;
-		RBShell *shell;
-
-		username = rb_audioscrobbler_account_get_username (page->priv->account);
-		session_key = rb_audioscrobbler_account_get_session_key (page->priv->account);
-		g_object_get (page, "shell", &shell, NULL);
-
-		radio = rb_audioscrobbler_radio_source_new (page,
-		                                            page->priv->service,
-		                                            username,
-		                                            session_key,
-		                                            name,
-		                                            url);
-		page->priv->radio_sources = g_list_append (page->priv->radio_sources, radio);
-		g_signal_connect (radio, "notify::name",
-		                  G_CALLBACK (radio_station_name_changed_cb),
-		                  page);
-		save_radio_stations (page);
-
-		g_object_unref (shell);
-	}
-
-	return radio;
-}
-
-/* called when a radio station's name changes */
-static void
-radio_station_name_changed_cb (RBAudioscrobblerRadioSource *radio,
-                               GParamSpec *spec,
-                               RBAudioscrobblerProfilePage *page)
-{
-	/* save list of stations with new name */
-	save_radio_stations (page);
-}
-
-/* removes a station from user's list of radio stations, deletes the source */
-void
-rb_audioscrobbler_profile_page_remove_radio_station (RBAudioscrobblerProfilePage *page,
-						     RBSource *station)
-{
-	GList *i;
-
-	i = g_list_find (page->priv->radio_sources, station);
-
-	if (i != NULL) {
-		rb_display_page_delete_thyself (i->data);
-		page->priv->radio_sources = g_list_remove (page->priv->radio_sources, i->data);
-		save_radio_stations (page);
-	}
 }
 
 static gboolean
@@ -1645,34 +1213,6 @@ create_popup_menu (RBAudioscrobblerProfilePage *page,
 		g_free (item_text);
 	}
 
-	/* Similar artists radio */
-	if (data->type == RB_AUDIOSCROBBLER_USER_DATA_TYPE_TRACK ||
-	    data->type == RB_AUDIOSCROBBLER_USER_DATA_TYPE_ARTIST) {
-		GtkWidget *similar_artists_item;
-
-		similar_artists_item = gtk_menu_item_new_with_mnemonic (_("Listen to _Similar Artists Radio"));
-		g_signal_connect (similar_artists_item,
-				  "activate",
-				  G_CALLBACK (list_item_listen_similar_artists_activated_cb),
-				  page);
-
-		gtk_menu_shell_append (GTK_MENU_SHELL (menu), similar_artists_item);
-	}
-
-	/* Top fans radio */
-	if (data->type == RB_AUDIOSCROBBLER_USER_DATA_TYPE_TRACK ||
-	    data->type == RB_AUDIOSCROBBLER_USER_DATA_TYPE_ARTIST) {
-		GtkWidget *top_fans_item;
-
-		top_fans_item = gtk_menu_item_new_with_mnemonic (_("Listen to _Top Fans Radio"));
-		g_signal_connect (top_fans_item,
-				  "activate",
-				  G_CALLBACK (list_item_listen_top_fans_activated_cb),
-				  page);
-
-		gtk_menu_shell_append (GTK_MENU_SHELL (menu), top_fans_item);
-	}
-
 	gtk_widget_show_all (menu);
 
 	return menu;
@@ -1714,80 +1254,6 @@ list_item_view_url_activated_cb (GtkMenuItem *menuitem,
 }
 
 static void
-list_item_listen_similar_artists_activated_cb (GtkMenuItem *menuitem,
-                                               RBAudioscrobblerProfilePage *page)
-{
-	GtkWidget *menu;
-	RBAudioscrobblerUserData *data;
-	const char *artist = NULL;
-	char *radio_url;
-	char *radio_name;
-	RBSource *radio;
-	RBShell *shell;
-	RBDisplayPageTree *page_tree;
-
-	menu = gtk_widget_get_parent (GTK_WIDGET (menuitem));
-	data = g_hash_table_lookup (page->priv->popup_menu_to_data_map, menu);
-	if (data->type == RB_AUDIOSCROBBLER_USER_DATA_TYPE_ARTIST) {
-		artist = data->artist.name;
-	} else if (data->type == RB_AUDIOSCROBBLER_USER_DATA_TYPE_TRACK) {
-		artist = data->track.artist;
-	}
-
-	radio_url = g_strdup_printf (rb_audioscrobbler_radio_type_get_url (RB_AUDIOSCROBBLER_RADIO_TYPE_SIMILAR_ARTISTS),
-	                             artist);
-	radio_name = g_strdup_printf (rb_audioscrobbler_radio_type_get_default_name (RB_AUDIOSCROBBLER_RADIO_TYPE_SIMILAR_ARTISTS),
-	                              artist);
-
-	radio = add_radio_station (page, radio_url, radio_name);
-	g_object_get (page, "shell", &shell, NULL);
-	g_object_get (shell, "display-page-tree", &page_tree, NULL);
-	rb_display_page_tree_select (page_tree, RB_DISPLAY_PAGE (radio));
-
-	g_free (radio_url);
-	g_free (radio_name);
-	g_object_unref (shell);
-	g_object_unref (page_tree);
-}
-
-static void
-list_item_listen_top_fans_activated_cb (GtkMenuItem *menuitem,
-                                        RBAudioscrobblerProfilePage *page)
-{
-	GtkWidget *menu;
-	RBAudioscrobblerUserData *data;
-	const char *artist = NULL;
-	char *radio_url;
-	char *radio_name;
-	RBSource *radio;
-	RBShell *shell;
-	RBDisplayPageTree *page_tree;
-
-	menu = gtk_widget_get_parent (GTK_WIDGET (menuitem));
-	data = g_hash_table_lookup (page->priv->popup_menu_to_data_map, menu);
-	if (data->type == RB_AUDIOSCROBBLER_USER_DATA_TYPE_ARTIST) {
-		artist = data->artist.name;
-	} else if (data->type == RB_AUDIOSCROBBLER_USER_DATA_TYPE_TRACK) {
-		artist = data->track.artist;
-	}
-
-	radio_url = g_strdup_printf (rb_audioscrobbler_radio_type_get_url (RB_AUDIOSCROBBLER_RADIO_TYPE_TOP_FANS),
-	                             artist);
-	radio_name = g_strdup_printf (rb_audioscrobbler_radio_type_get_default_name (RB_AUDIOSCROBBLER_RADIO_TYPE_TOP_FANS),
-	                              artist);
-
-	radio = add_radio_station (page, radio_url, radio_name);
-	g_object_get (page, "shell", &shell, NULL);
-	g_object_get (shell, "display-page-tree", &page_tree, NULL);
-	rb_display_page_tree_select (page_tree, RB_DISPLAY_PAGE (radio));
-
-	g_free (radio_url);
-	g_free (radio_name);
-	g_object_unref (shell);
-	g_object_unref (page_tree);
-}
-
-static void
 impl_selected (RBDisplayPage *bpage)
 {
 	RBAudioscrobblerProfilePage *page = RB_AUDIOSCROBBLER_PROFILE_PAGE (bpage);
@@ -1815,16 +1281,7 @@ impl_deselected (RBDisplayPage *bpage)
 static void
 impl_delete_thyself (RBDisplayPage *bpage)
 {
-	RBAudioscrobblerProfilePage *page;
-	GList *i;
-
 	rb_debug ("deleting profile page");
-
-	page = RB_AUDIOSCROBBLER_PROFILE_PAGE (bpage);
-
-	for (i = page->priv->radio_sources; i != NULL; i = i->next) {
-		rb_display_page_delete_thyself (i->data);
-	}
 }
 
 void

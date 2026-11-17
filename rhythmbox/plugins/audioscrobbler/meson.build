@@ -9,13 +9,10 @@ audioscrobbler_sources = [
   'rb-audioscrobbler-service.c',
   'rb-audioscrobbler-user.c',
   'rb-audioscrobbler.c',
-  'rb-audioscrobbler-radio-source.c',
-  'rb-audioscrobbler-radio-track-entry-type.c',
   'rb-audioscrobbler-play-order.c']
 
 audioscrobbler_test_sources = [
-  'rb-audioscrobbler-entry.c',
-  'rb-audioscrobbler-radio-track-entry-type.c']
+  'rb-audioscrobbler-entry.c']
 
 shared_module('audioscrobbler',
   audioscrobbler_sources,

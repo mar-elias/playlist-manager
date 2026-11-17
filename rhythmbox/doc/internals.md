@@ -41,8 +41,7 @@ RhythmDB has multiple threads; we'll talk later about thread safety.
 ### RhythmDBEntry
 
 The core data type is RhythmDBEntry - this is an abstract pointer
-which represents either a a local song in the library, or internet
-radio station.
+which represents a local song in the library.
 
 #### Dynamic properties
 
@@ -95,8 +94,7 @@ RhythmDBTree does a lot of work to maintain this tree structure - it
 can handle you changing just the artist of a song.
 
 There is actually one of these trees for each "type" of RhythmDBEntry.
-The main type is `RHYTHMDB_ENTRY_TYPE_SONG`, but there is also
-`RHYTHMDB_ENTRY_TYPE_IRADIO_STATION` for Internet Radio stations.
+The main type is `RHYTHMDB_ENTRY_TYPE_SONG`.
 
 #### Saving/loading
 

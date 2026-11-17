@@ -38,7 +38,6 @@
 #include "rhythmdb.h"
 
 #include "rb-audioscrobbler-entry.h"
-#include "rb-audioscrobbler-radio-track-entry-type.h"
 
 
 void
@@ -101,27 +100,10 @@ rb_audioscrobbler_entry_create (RhythmDBEntry *rb_entry, RBAudioscrobblerService
 		as_entry->mbid = g_strdup ("");
 	}
 
-	/* identify the source type. Currently we use:
-	 * L for an audioscrobbler-provided radio track when scrobbling to its own service
-	 * E for an audioscrobbler-provided radio track when scrobbling to a different service
-	 * P for everything else
+	/* P marks a track played from the user's library.
 	 * TODO: Use R or E in some cases instead of P
 	 */
-	if (rhythmdb_entry_get_entry_type (rb_entry) == RHYTHMDB_ENTRY_TYPE_AUDIOSCROBBLER_RADIO_TRACK) {
-		RBAudioscrobblerRadioTrackData *track_data;
-		track_data = RHYTHMDB_ENTRY_GET_TYPE_DATA (rb_entry, RBAudioscrobblerRadioTrackData);
-
-		/* only use L if we have an auth code,
-		 * and the track is from the correct service (ie not for a Libre.fm track scrobbling to Last.fm)
-		 */
-		if (track_data->track_auth != NULL && track_data->service == service) {
-			as_entry->source = g_strdup_printf ("L%s", track_data->track_auth);
-		} else {
-			as_entry->source = g_strdup ("E");
-		}
-	} else {
-		as_entry->source = g_strdup ("P");
-	}
+	as_entry->source = g_strdup ("P");
 
 	return as_entry;
 }

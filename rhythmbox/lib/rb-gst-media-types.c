@@ -30,6 +30,7 @@
 #include <memory.h>
 
 #include <gst/pbutils/encoding-target.h>
+#include <gio/gio.h>
 
 #include <lib/rb-gst-media-types.h>
 #include <lib/rb-debug.h>
@@ -49,6 +50,7 @@ static const char *container_formats[] = {
 };
 
 #define ENCODING_TARGET_FILE "rhythmbox.gep"
+#define ENCODING_TARGET_RESOURCE "/org/gnome/Rhythmbox/rhythmbox.gep"
 static GstEncodingTarget *default_target = NULL;
 static GKeyFile *target_keyfile = NULL;
 
@@ -261,17 +263,58 @@ rb_gst_encoding_profile_get_media_type (GstEncodingProfile *profile)
 }
 
 static char *
+encoding_target_file_from_resource (void)
+{
+	GBytes *bytes;
+	GError *error = NULL;
+	char *target_file;
+	const char *cache_dir;
+
+	bytes = g_resources_lookup_data (ENCODING_TARGET_RESOURCE, 0, &error);
+	if (bytes == NULL) {
+		g_warning ("Unable to load built-in encoding profiles: %s",
+			   error ? error->message : "no error");
+		g_clear_error (&error);
+		return NULL;
+	}
+
+	cache_dir = rb_user_cache_dir ();
+	if (cache_dir == NULL) {
+		g_bytes_unref (bytes);
+		return NULL;
+	}
+
+	target_file = g_build_filename (cache_dir, ENCODING_TARGET_FILE, NULL);
+	if (!g_file_set_contents (target_file,
+				  g_bytes_get_data (bytes, NULL),
+				  g_bytes_get_size (bytes),
+				  &error)) {
+		g_warning ("Unable to write encoding profiles to %s: %s",
+			   target_file, error->message);
+		g_clear_error (&error);
+		g_free (target_file);
+		target_file = NULL;
+	}
+	g_bytes_unref (bytes);
+	return target_file;
+}
+
+static char *
 get_encoding_target_file (void)
 {
 	char *target_file;
+	const char *installed;
 
 	target_file = rb_find_user_data_file (ENCODING_TARGET_FILE);
-	if (g_file_test (target_file, G_FILE_TEST_EXISTS) == FALSE) {
-		g_free (target_file);
-		target_file = g_strdup (rb_file (ENCODING_TARGET_FILE));
-	}
+	if (target_file != NULL && g_file_test (target_file, G_FILE_TEST_EXISTS))
+		return target_file;
+	g_free (target_file);
 
-	return target_file;
+	installed = rb_file (ENCODING_TARGET_FILE);
+	if (installed != NULL)
+		return g_strdup (installed);
+
+	return encoding_target_file_from_resource ();
 }
 
 /**
@@ -287,6 +330,10 @@ rb_gst_get_default_encoding_target (void)
 		GError *error = NULL;
 
 		target_file = get_encoding_target_file ();
+		if (target_file == NULL) {
+			g_warning ("Unable to find encoding profiles");
+			return NULL;
+		}
 		default_target = gst_encoding_target_load_from_file (target_file, &error);
 		if (default_target == NULL) {
 			g_warning ("Unable to load encoding profiles from %s: %s", target_file, error ? error->message : "no error");
@@ -312,6 +359,8 @@ rb_gst_get_encoding_profile (const char *media_type)
 	const GList *l;
 	GstEncodingTarget *target;
 	target = rb_gst_get_default_encoding_target ();
+	if (target == NULL)
+		return NULL;
 
 	for (l = gst_encoding_target_get_profiles (target); l != NULL; l = l->next) {
 		GstEncodingProfile *profile = l->data;

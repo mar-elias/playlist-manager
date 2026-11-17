@@ -59,8 +59,7 @@
  * move and drag events into seek requests for the player backend.
  *
  * For shoutcast-style streams, the title/artist/album display is supplemented
- * by metadata extracted from the stream.  See #RBStreamingSource for more information
- * on how the metadata is reported.
+ * by stream song title, artist, and album metadata stored on the playing entry.
  */
 
 static void rb_header_class_init (RBHeaderClass *klass);

@@ -520,7 +520,10 @@ impl_constructed (GObject *object)
 	gtk_container_add (GTK_CONTAINER (settings), grid);
 
 	settings->priv->profile_model = GTK_TREE_MODEL (gtk_tree_store_new (3, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_POINTER));
-	for (p = gst_encoding_target_get_profiles (settings->priv->target); p != NULL; p = p->next) {
+	p = NULL;
+	if (settings->priv->target != NULL)
+		p = gst_encoding_target_get_profiles (settings->priv->target);
+	for (; p != NULL; p = p->next) {
 		GstEncodingProfile *profile = GST_ENCODING_PROFILE (p->data);
 		char *media_type;
 

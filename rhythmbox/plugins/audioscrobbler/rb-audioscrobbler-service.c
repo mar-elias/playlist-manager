@@ -35,7 +35,6 @@
 #define LASTFM_AUTH_URL "https://www.last.fm/api/auth/"
 #define LASTFM_SCROBBLER_URL "http://post.audioscrobbler.com/"
 #define LASTFM_API_URL "https://ws.audioscrobbler.com/2.0/"
-#define LASTFM_OLD_RADIO_API_URL "https://ws.audioscrobbler.com/"
 /* this API key belongs to Jamie Nicol <jamie@thenicols.net>
    generated May 2010 for use in the audioscrobbler plugin */
 #define LASTFM_API_KEY "0337ff3c59299b6a31d75164041860b6"
@@ -53,7 +52,6 @@ struct _RBAudioscrobblerServicePrivate {
 	char *auth_url;
 	char *scrobbler_url;
 	char *api_url;
-	char *old_radio_api_url;
 	char *api_key;
 	char *api_secret;
 };
@@ -77,7 +75,6 @@ enum
 	PROP_AUTH_URL,
 	PROP_SCROBBLER_URL,
 	PROP_API_URL,
-	PROP_OLD_RADIO_API_URL,
 	PROP_API_KEY,
 	PROP_API_SECRET,
 };
@@ -93,7 +90,6 @@ rb_audioscrobbler_service_new_lastfm (void)
 	                     "auth-url", LASTFM_AUTH_URL,
 	                     "scrobbler-url", LASTFM_SCROBBLER_URL,
 	                     "api-url", LASTFM_API_URL,
-	                     "old-radio-api-url", LASTFM_OLD_RADIO_API_URL,
 	                     "api-key", LASTFM_API_KEY,
 	                     "api-secret", LASTFM_API_SECRET,
 	                     NULL);
@@ -155,14 +151,6 @@ rb_audioscrobbler_service_class_init (RBAudioscrobblerServiceClass *klass)
                                                               G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
 	g_object_class_install_property (object_class,
-	                                 PROP_OLD_RADIO_API_URL,
-	                                 g_param_spec_string ("old-radio-api-url",
-	                                                      "Old Radio API URL",
-	                                                      "URL that radio requests using the old API should be sent to",
-	                                                      NULL,
-                                                              G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
-
-	g_object_class_install_property (object_class,
 	                                 PROP_API_KEY,
 	                                 g_param_spec_string ("api-key",
 	                                                      "API Key",
@@ -201,7 +189,6 @@ rb_audioscrobbler_service_finalize (GObject *object)
 	g_free (service->priv->auth_url);
 	g_free (service->priv->scrobbler_url);
 	g_free (service->priv->api_url);
-	g_free (service->priv->old_radio_api_url);
 	g_free (service->priv->api_key);
 	g_free (service->priv->api_secret);
 
@@ -228,9 +215,6 @@ rb_audioscrobbler_service_get_property (GObject *object,
 		break;
 	case PROP_API_URL:
 		g_value_set_string (value, rb_audioscrobbler_service_get_api_url (service));
-		break;
-	case PROP_OLD_RADIO_API_URL:
-		g_value_set_string (value, rb_audioscrobbler_service_get_old_radio_api_url (service));
 		break;
 	case PROP_API_KEY:
 		g_value_set_string (value, rb_audioscrobbler_service_get_api_key (service));
@@ -269,10 +253,6 @@ rb_audioscrobbler_service_set_property (GObject *object,
 		g_free (service->priv->api_url);
 		service->priv->api_url = g_value_dup_string (value);
 		break;
-	case PROP_OLD_RADIO_API_URL:
-		g_free (service->priv->old_radio_api_url);
-		service->priv->old_radio_api_url = g_value_dup_string (value);
-		break;
 	case PROP_API_KEY:
 		g_free (service->priv->api_key);
 		service->priv->api_key = g_value_dup_string (value);
@@ -309,12 +289,6 @@ const char *
 rb_audioscrobbler_service_get_api_url (RBAudioscrobblerService *service)
 {
 	return service->priv->api_url;
-}
-
-const char *
-rb_audioscrobbler_service_get_old_radio_api_url (RBAudioscrobblerService *service)
-{
-	return service->priv->old_radio_api_url;
 }
 
 const char *

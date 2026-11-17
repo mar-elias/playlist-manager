@@ -46,8 +46,6 @@
 #include "rb-audioscrobbler.h"
 #include "rb-audioscrobbler-play-order.h"
 #include "rb-audioscrobbler-profile-page.h"
-#include "rb-audioscrobbler-radio-source.h"
-#include "rb-audioscrobbler-radio-track-entry-type.h"
 #include "rb-audioscrobbler-service.h"
 #include "rb-audioscrobbler-user.h"
 
@@ -274,8 +272,6 @@ peas_register_types (PeasObjectModule *module)
 	_rb_audioscrobbler_register_type (G_TYPE_MODULE (module));
 	_rb_audioscrobbler_play_order_register_type (G_TYPE_MODULE (module));
 	_rb_audioscrobbler_profile_page_register_type (G_TYPE_MODULE (module));
-	_rb_audioscrobbler_radio_source_register_type (G_TYPE_MODULE (module));
-	_rb_audioscrobbler_radio_track_entry_type_register_type (G_TYPE_MODULE (module));
 	_rb_audioscrobbler_service_register_type (G_TYPE_MODULE (module));
 	_rb_audioscrobbler_user_register_type (G_TYPE_MODULE (module));
 

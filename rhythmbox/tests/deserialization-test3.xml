@@ -15,14 +15,4 @@
     <last-played>0</last-played>
     <quality>0</quality>
   </entry>
-  <entry type="iradio">
-    <title>Blah</title>
-    <genre>Techno</genre>
-    <location>http://www.moo.com</location>
-    <mtime>3802352</mtime>
-    <rating>4</rating>
-    <play-count>11</play-count>
-    <last-played>3289235</last-played>
-    <quality>2</quality>
-  </entry>
 </rhythmdb>

@@ -30,7 +30,6 @@
 #define __RB_AUDIOSCROBBLER_PROFILE_PAGE_H
 
 #include <sources/rb-display-page.h>
-#include <sources/rb-source.h>
 #include <shell/rb-shell.h>
 
 #include "rb-audioscrobbler-service.h"
@@ -63,8 +62,6 @@ void 		_rb_audioscrobbler_profile_page_register_type (GTypeModule *module);
 RBDisplayPage  *rb_audioscrobbler_profile_page_new (RBShell *shell,
 						    GObject *plugin,
 						    RBAudioscrobblerService *service);
-void 		rb_audioscrobbler_profile_page_remove_radio_station (RBAudioscrobblerProfilePage *page,
-								     RBSource *station);
 
 G_END_DECLS
 

@@ -3,7 +3,7 @@ Slug: plugin-guide
 
 # Introduction to Rhythmbox plugins
 
-Rhythmbox plugins are external pieces of code that can be loaded to provide extra functionality that is not found in the normal "vanilla" Rhythmbox. Plugins can do basically everything that Rhythmbox itself could do, and in fact some "core" features like Audio CD support and Internet Radio are actually plugins (although not displayed to users as such).
+Rhythmbox plugins are external pieces of code that can be loaded to provide extra functionality that is not found in the normal "vanilla" Rhythmbox. Plugins can do basically everything that Rhythmbox itself could do, and in fact some "core" features like Audio CD support are actually plugins (although not displayed to users as such).
 
 Rhythmbox plugins can currently be written in two languages, C and Python.  Python plugins are generally easier to write and maintain, unless you are an experienced GObject-based C programmer, so they are recommended for new plugins.  Note that Python plugins must only use pygobject (introspected bindings) to access GObject-based libraries.  If you're importing such a library by doing anything other than `from gi.repository import Something`, your plugin will crash.  Static and introspected bindings do not mix.
 
@@ -87,7 +87,7 @@ The "track list" is an instance of the [class@EntryView] class which uses a [cla
 
 ### Lower-level database
 
-Almost all of the data in Rhythmbox is stored in a database called [class@RhythmDB]. The most important data structure in the database is the ''entry'' [struct@RhythmDBEntry] which represents a single track, radio station or similar item. Each entry has a set of properties with associated values, such as "title", "artist", "play count" and so one; one of these properties is special, the "location" which must be unique among all the entries in the database.  Entries are identified with an entry type ([class@RhythmDBEntryType]) which defines some aspects of the entry's behaviour.
+Almost all of the data in Rhythmbox is stored in a database called [class@RhythmDB]. The most important data structure in the database is the ''entry'' [struct@RhythmDBEntry] which represents a single track or similar item. Each entry has a set of properties with associated values, such as "title", "artist", "play count" and so one; one of these properties is special, the "location" which must be unique among all the entries in the database.  Entries are identified with an entry type ([class@RhythmDBEntryType]) which defines some aspects of the entry's behaviour.
 
 ### Higher-level database
 
