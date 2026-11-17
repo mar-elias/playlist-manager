@@ -118,7 +118,6 @@ main (int argc, char **argv)
 			wait_for_signal ();
 
 			rhythmdb_entry_delete_by_type (db, RHYTHMDB_ENTRY_TYPE_SONG);
-			rhythmdb_entry_delete_by_type (db, rhythmdb_entry_type_get_by_name (db, "iradio"));
 		}
 		rb_profile_end ("10 rhythmdb loads");
 		g_print ("completed %d loads\n", i * 10);

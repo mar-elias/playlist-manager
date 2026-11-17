@@ -78,7 +78,7 @@ G_DEFINE_TYPE (RhythmDBEntryType, rhythmdb_entry_type, G_TYPE_OBJECT)
  *
  * This is the base class for database entry type classes, which provide
  * some aspects of the behaviour of database entry types.  There are different
- * entry types for songs, radio streams, and so on.
+ * entry types for songs and similar items.
  *
  * Plugins written in Python or Vala can create new entry types by subclassing
  * and overriding any methods required.  Plugins written in C can create a new

@@ -211,14 +211,6 @@ if brasero_media.found()
   plugins += 'brasero-disc-recorder'
 endif
 
-if get_option('fm_radio').allowed()
-  if cc.has_header('linux/videodev2.h')
-    plugins += 'fmradio'
-  elif get_option('fm_radio').enabled()
-    error('FM radio plugin explicitly requested, but cannot be built')
-  endif
-endif
-
 if get_option('daap').allowed()
   libdmapsharing4 = dependency('libdmapsharing-4.0', version: '>= 3.9.11', required: get_option('daap'))
   if libdmapsharing4.found()
@@ -271,7 +263,6 @@ summary({'iPod integration': plugins.contains('ipod'),
          'Use girepository 2.0': enable_gir2,
          'Vala plugin support': enable_vala,
          'Libsecret keyring support': libsecret.found(),
-         'FM radio support': plugins.contains('fmradio'),
          'Grilo support': plugins.contains('grilo'),
          'Sample plugins': get_option('sample-plugins'),
         },

@@ -289,21 +289,6 @@
     <child name="encoding" schema="org.gnome.rhythmbox.encoding-settings"/>
   </schema>
 
-  <schema id="org.gnome.rhythmbox.plugins.iradio.source" extends="org.gnome.rhythmbox.source">
-    <override name="sorting">('Title',true)</override>
-    <override name="paned-position">200</override>
-    <override name="show-browser">true</override>
-  </schema>
-  <schema id="org.gnome.rhythmbox.plugins.iradio" path="/org/gnome/rhythmbox/plugins/iradio/">
-    <key name="initial-stations-loaded" type="b">
-      <default>false</default>
-      <summary>Whether the initial station list has been loaded</summary>
-      <description>Whether the initial station list has been loaded</description>
-    </key>
-
-    <child name='source' schema='org.gnome.rhythmbox.plugins.iradio.source'/>
-  </schema>
-
   <schema id="org.gnome.rhythmbox.plugins.listenbrainz" path="/org/gnome/rhythmbox/plugins/listenbrainz/">
       <key type="s" name="user-token">
           <default>""</default>

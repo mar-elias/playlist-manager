@@ -13,7 +13,6 @@ sources_headers = files(
   'rb-source-search.h',
   'rb-source.h',
   'rb-static-playlist-source.h',
-  'rb-streaming-source.h',
   'rb-transfer-target.h'
 )
 
@@ -38,7 +37,6 @@ sources_sources = files(
   'rb-source-search.c',
   'rb-source.c',
   'rb-static-playlist-source.c',
-  'rb-streaming-source.c',
   'rb-transfer-target.c',
   'sync/rb-sync-settings.c',
   'sync/rb-sync-settings-ui.c',

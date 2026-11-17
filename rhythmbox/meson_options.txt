@@ -1,6 +1,5 @@
 option('brasero', type: 'feature', value: 'disabled', description: 'Enable disc burning support using libbrasero-media')
 option('daap', type: 'feature', value: 'disabled', description: 'Enable DAAP sharing support using libdmapsharing')
-option('fm_radio', type: 'feature', value: 'disabled', description: 'Enable FM radio support')
 option('grilo', type: 'feature', value: 'disabled', description: 'Enable Grilo support')
 option('gudev', type: 'feature', value: 'disabled', description: 'Enable GUdev for hardware detection')
 option('ipod', type: 'feature', value: 'disabled', description: 'Enable iPod support')
