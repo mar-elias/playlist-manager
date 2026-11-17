@@ -1,14 +1,11 @@
-po_dir = meson.project_source_root() / 'po'
-
 desktop_files = [ 'org.gnome.Rhythmbox3.desktop', 'org.gnome.Rhythmbox3.device.desktop' ]
-foreach desktop_file : desktop_files
-  desktop_file = i18n.merge_file(
-    input: desktop_file + '.in',
-    output: desktop_file,
+foreach name : desktop_files
+  configure_file(
+    input: name + '.in',
+    output: name,
+    copy: true,
     install: true,
     install_dir: datadir / 'applications',
-    po_dir: po_dir,
-    type: 'desktop',
   )
 endforeach
 
@@ -35,11 +32,10 @@ gschemas_compiled = custom_target('gschemas.compiled',
   command: [glib_compile_schemas, '--targetdir=' + meson.current_build_dir(), meson.current_source_dir()]
 )
 
-playlists_xml = i18n.merge_file(
+playlists_xml = configure_file(
   input: 'playlists.xml.in',
   output: 'playlists.xml',
-  po_dir: po_dir,
-  data_dirs: meson.project_source_root() / 'data'
+  copy: true,
 )
 
 install_data('rhythmbox.gep',
@@ -54,14 +50,12 @@ mans = [
 install_man(mans)
 
 metainfo = 'org.gnome.Rhythmbox3.metainfo.xml'
-
-metainfo_file = i18n.merge_file(
+metainfo_file = configure_file(
   input: metainfo + '.in',
   output: metainfo,
+  copy: true,
   install: true,
   install_dir: datadir / 'metainfo',
-  po_dir: po_dir,
-  type: 'xml',
 )
 
 # Validate AppStream metadata
@@ -69,7 +63,6 @@ appstreamcli = find_program('appstreamcli', required: false)
 if appstreamcli.found()
   test(
       'validate-metainfo', appstreamcli,
-      depends: metainfo_file,
-      args: ['validate', '--no-net', '--explain', metainfo_file.full_path()]
+      args: ['validate', '--no-net', '--explain', meson.current_build_dir() / metainfo]
       )
 endif

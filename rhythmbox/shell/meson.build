@@ -2,26 +2,6 @@ gnome = import('gnome')
 
 make_tab_command = ['sed', '-e', 's/^/"/', '-e', 's/$/",/', '@INPUT@']
 
-authors_tab = custom_target('AUTHORS.tab',
-  input: '../AUTHORS', output: 'AUTHORS.tab',
-  command: make_tab_command, capture: true
-)
-
-maintainers_tab = custom_target('MAINTAINERS.tab',
-  input: '../MAINTAINERS', output: 'MAINTAINERS.tab',
-  command: make_tab_command, capture: true
-)
-
-maintainers_old_tab = custom_target('MAINTAINERS.old.tab',
-  input: '../MAINTAINERS.old', output: 'MAINTAINERS.old.tab',
-  command: make_tab_command, capture: true
-)
-
-documenters_tab = custom_target('DOCUMENTERS.tab',
-  input: '../DOCUMENTERS', output: 'DOCUMENTERS.tab',
-  command: make_tab_command, capture: true
-)
-
 shell_headers = files(
   'rb-application.h',
   'rb-shell.h',
@@ -66,10 +46,6 @@ shell_sources = files(
   'rb-track-transfer-queue.c',
 ) + [
   resources,
-  authors_tab,
-  documenters_tab,
-  maintainers_tab,
-  maintainers_old_tab,
 ]
 
 shell_c_args = [

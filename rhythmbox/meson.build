@@ -181,17 +181,12 @@ endif
 plugin_headers = ['plugins/rb-plugin-macros.h']
 install_headers(plugin_headers, subdir: 'rhythmbox/plugins')
 
-po_dir = meson.project_source_root() / 'po'
 # FIXME: Move custom_target to i18n.merge_file when gettext acquires plugin support.
 #        http://lists.gnu.org/archive/html/bug-gettext/2017-06/msg00001.html
 msgfmt_plugin_cmd = [
-  find_program('msgfmt'),
-  '--desktop',
-  '--keyword=Name',
-  '--keyword=Description',
-  '--template=@INPUT@',
-  '-d', po_dir,
-  '--output=@OUTPUT@'
+  find_program('cp'),
+  '@INPUT@',
+  '@OUTPUT@',
 ]
 
 ##########
@@ -285,13 +280,6 @@ if grilo.found()
   endif
 endif
 
-meson.add_dist_script(
-  find_program('check-news.sh').full_path(),
-  '@0@'.format(meson.project_version()),
-  'NEWS',
-  'data/org.gnome.Rhythmbox3.metainfo.xml.in'
-)
-
 pkg.generate(
   name: 'rhythmbox',
   description: 'plugin API for rhythmbox',
@@ -381,11 +369,5 @@ endif
 if check.found()
   subdir('tests')
 endif
-subdir('po')
-if get_option('apidoc')
-  subdir('doc')
-endif
-if get_option('help')
-  subdir('help')
-endif
+
 

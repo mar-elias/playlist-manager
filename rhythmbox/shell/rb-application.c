@@ -146,25 +146,6 @@ about_action_cb (GSimpleAction *action, GVariant *parameters, gpointer user_data
 	const char **tem;
 	GString *comment;
 
-	const char *authors[] = {
-		"",
-#include "MAINTAINERS.tab"
-		"",
-		NULL,
-#include "MAINTAINERS.old.tab"
-		"",
-		NULL,
-#include "AUTHORS.tab"
-		NULL
-	};
-
-	const char *documenters[] = {
-#include "DOCUMENTERS.tab"
-		NULL
-	};
-
-	const char *translator_credits = _("translator-credits");
-
 	const char *license[] = {
 		N_("Rhythmbox is free software; you can redistribute it and/or modify\n"
 		   "it under the terms of the GNU General Public License as published by\n"
@@ -181,14 +162,6 @@ about_action_cb (GSimpleAction *action, GVariant *parameters, gpointer user_data
 
 	char *license_trans;
 
-	authors[0] = _("Maintainers:");
-	for (tem = authors; *tem != NULL; tem++)
-		;
-	*tem = _("Former Maintainers:");
-	for (; *tem != NULL; tem++)
-		;
-	*tem = _("Contributors:");
-
 	comment = g_string_new (_("Music management and playback software for GNOME."));
 
 	license_trans = g_strconcat (_(license[0]), "\n", _(license[1]), "\n",
@@ -202,9 +175,6 @@ about_action_cb (GSimpleAction *action, GVariant *parameters, gpointer user_data
 			       "website-label", _("Rhythmbox Website"),
 			       "website", "https://gnome.pages.gitlab.gnome.org/rhythmbox/",
 			       "comments", comment->str,
-			       "authors", (const char **) authors,
-			       "documenters", (const char **) documenters,
-			       "translator-credits", strcmp (translator_credits, "translator-credits") != 0 ? translator_credits : NULL,
 			       "logo-icon-name", RB_APP_ICON,
 			       NULL);
 	g_string_free (comment, TRUE);
@@ -307,7 +277,7 @@ impl_startup (GApplication *app)
 	};
 
 	(* G_APPLICATION_CLASS (rb_application_parent_class)->startup) (app);
-	
+
 	rb_stock_icons_init ();
 
 	g_action_map_add_action_entries (G_ACTION_MAP (app),
@@ -412,7 +382,7 @@ static void
 impl_finalize (GObject *object)
 {
 	RBApplication *app = RB_APPLICATION (object);
-	
+
 	g_hash_table_destroy (app->priv->shared_menus);
 	g_hash_table_destroy (app->priv->plugin_menus);
 	rb_file_helpers_shutdown ();
