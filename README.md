@@ -27,13 +27,10 @@ Rhythmbox requires the following packages:
 Rhythmbox can also make use of the following packages:
 
 - pygobject 3.0.0 or newer (for python plugin support)
-- GUdev 143 or newer (for iPod and generic audio player support)
+- GUdev 143 or newer (for iPod support)
 - libgpod 0.7.92 or newer (for iPod support)
 - libnotify 0.7 or newer
-- libbrasero-media 2.31.5 or newer
-- libdmapsharing 3.9.11 or newer
 - libsecret 0.18 or newer
-- grilo 0.3.1 or newer
 - itstool (for documentation)
 - gi-docgen (for API documentation)
 

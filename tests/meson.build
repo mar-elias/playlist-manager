@@ -44,13 +44,6 @@ test('test-rb-lib',
   env: test_env,
 )
 
-test('test-audioscrobbler',
-  executable('test-audioscrobbler',
-    ['test-audioscrobbler.c', 'test-utils.c'],
-    dependencies: [rhythmbox_core_dep, audioscrobbler_test_dep, check]),
-  env: test_env,
-)
-
 test_widgets_resources = gnome.compile_resources('test-widgets-resources', 'test-widgets.gresource.xml',
   source_dir: ['../data'])
 test('test-widgets',

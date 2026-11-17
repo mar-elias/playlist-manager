@@ -167,33 +167,6 @@
     <child name='encoding' schema='org.gnome.rhythmbox.encoding-settings'/>
     <child name='source' schema='org.gnome.rhythmbox.source'/>
   </schema>
-  <schema id="org.gnome.rhythmbox.sharing" path="/org/gnome/rhythmbox/sharing/">
-    <key name="enable-browsing" type="b">
-      <default>true</default>
-      <summary>Enables browsing your network for computers with shared music</summary>
-      <description>When enabled, Rhythmbox will search for shared music on your local network</description>
-    </key>
-    <key name="enable-sharing" type="b">
-      <default>false</default>
-      <summary>Enables sharing your music with computers on your network</summary>
-      <description>When enabled, Rhythmbox will share your music with other computers</description>
-    </key>
-    <key name="require-password" type="b">
-      <default>false</default>
-      <summary>Require a password to access your music over the network</summary>
-      <description>When enabled, Rhythmbox will require a password for others to access your music over the network.</description>
-    </key>
-    <key name="share-name" type="s">
-      <default>''</default>
-      <summary>Name for your shared music</summary>
-      <description>Name other computers will see your music shared as</description>
-    </key>
-    <key name="share-password" type="s">
-      <default>''</default>
-      <summary>Password for your shared music</summary>
-      <description>Password that is required for accessing your shared music.</description>
-    </key>
-  </schema>
   <schema id="org.gnome.rhythmbox.player" path="/org/gnome/rhythmbox/player/">
     <key name="use-xfade-backend" type="b">
       <default>true</default>
@@ -234,52 +207,7 @@
     </key>
   </schema>
 
-  <schema id="org.gnome.rhythmbox.plugins.audiocd" path="/org/gnome/rhythmbox/plugins/audiocd/">
-    <child name='source' schema='org.gnome.rhythmbox.source'/>
-  </schema>
-
-  <schema id="org.gnome.rhythmbox.plugins.audioscrobbler.service">
-    <key name="enabled" type="b">
-      <default>true</default>
-      <summary>Whether the service is enabled</summary>
-      <description>
-	If true, the service will be displayed in the UI and will be available for streaming
-	and track submission.
-      </description>
-    </key>
-    <key name="scrobbling-enabled" type="b">
-      <default>true</default>
-      <summary>Whether scrobbling is enabled</summary>
-      <description>
-	If true, tracks you listen to will be submitted to all enabled scrobbling services.
-      </description>
-    </key>
-  </schema>
-
-  <schema id="org.gnome.rhythmbox.plugins.daap.dacp">
-    <key name="enable-remote" type="b">
-      <default>false</default>
-      <summary>Whether to enable iTunes Remote devices</summary>
-      <description>Whether to enable iTunes Remote devices</description>
-    </key>
-
-    <key name="known-remotes" type="as">
-      <default>[]</default>
-      <summary>A list of remotes that the user has paired with</summary>
-      <description>A list of remotes that the user has paired with.</description>
-    </key>
-  </schema>
-  <schema id="org.gnome.rhythmbox.plugins.daap" path="/org/gnome/rhythmbox/plugins/daap/">
-    <child name='dacp' schema='org.gnome.rhythmbox.plugins.daap.dacp'/>
-    <child name='source' schema='org.gnome.rhythmbox.source'/>
-  </schema>
-
   <schema id="org.gnome.rhythmbox.plugins.android" path="/org/gnome/rhythmbox/plugins/android/">
-    <child name='source' schema='org.gnome.rhythmbox.source'/>
-    <child name="encoding" schema="org.gnome.rhythmbox.encoding-settings"/>
-  </schema>
-
-  <schema id="org.gnome.rhythmbox.plugins.generic-player" path="/org/gnome/rhythmbox/plugins/generic-player/">
     <child name='source' schema='org.gnome.rhythmbox.source'/>
     <child name="encoding" schema="org.gnome.rhythmbox.encoding-settings"/>
   </schema>
@@ -369,10 +297,6 @@
 	loudness for all tracks.
       </description>
     </key>
-  </schema>
-
-  <schema id="org.gnome.rhythmbox.plugins.grilo" path="/org/gnome/rhythmbox/plugins/grilo/">
-    <child name="source" schema="org.gnome.rhythmbox.source"/>
   </schema>
 
   <schema id="org.gnome.rhythmbox.plugins.webremote" path="/org/gnome/rhythmbox/plugins/webremote/">

@@ -192,40 +192,7 @@ msgfmt_plugin_cmd = [
 ##########
 # Plugins
 
-plugins = [
-  'audiocd',
-  'audioscrobbler',
-  'generic-player',
-  'mpris',
-  'power-manager'
-]
-
-lirc = dependency('lirc', required: get_option('lirc'))
-if lirc.found()
-  plugins += 'lirc'
-endif
-
-brasero_media = dependency('libbrasero-media3', version: '>= 2.31.5', required: get_option('brasero'))
-if brasero_media.found()
-  plugins += 'brasero-disc-recorder'
-endif
-
-if get_option('daap').allowed()
-  libdmapsharing4 = dependency('libdmapsharing-4.0', version: '>= 3.9.11', required: get_option('daap'))
-  if libdmapsharing4.found()
-    plugins += 'daap'
-  endif
-endif
-
-grilo = dependency('grilo-0.3', version: '>= 0.3.1', required: get_option('grilo'))
-if grilo.found()
-  grilonet = dependency('grilo-net-0.3', required: get_option('grilo'))
-  if grilonet.get_variable(pkgconfig: 'soupapiversion', default_value: '3.0') == '3.0'
-    plugins += 'grilo'
-  elif get_option('grilo').enabled()
-    error('grilo plugin explicitly requested, but grilo is not built against libsoup 3.0')
-  endif
-endif
+plugins = []
 
 pkg.generate(
   name: 'rhythmbox',
@@ -254,15 +221,12 @@ summary({'Tests': check.found(),
         section: 'General',
         bool_yn: true)
 summary({'iPod integration': plugins.contains('ipod'),
-         'CD burning support': plugins.contains('brasero-disc-recorder'),
-         'DAAP (music sharing) support': plugins.contains('daap'),
          'libnotify support': plugins.contains('notification'),
          'GUdev support': gudev.found(),
          'Python plugin support': enable_python,
          'Use girepository 2.0': enable_gir2,
          'Vala plugin support': enable_vala,
          'Libsecret keyring support': libsecret.found(),
-         'Grilo support': plugins.contains('grilo'),
          'Sample plugins': get_option('sample-plugins'),
         },
         section: 'Plugins',
