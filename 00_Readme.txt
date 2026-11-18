@@ -17,10 +17,10 @@ export GSETTINGS_SCHEMA_DIR="$PWD/_install/share/glib-2.0/schemas"
 sudo apt install gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly gstreamer1.0-libav
 
 # TODO:
-- For mp4 files, show a monitor next to files, open them in vlc
+- For mp4 files, show an icon next to files, open them in vlc
 - Option to export/import playlists
+- make sure tags are written to files
 X - remove all radio tabs
 X - remove the rest of plugins
-- restore recently played tab
-- make sure tags are written to files
+X - restore recently played tab
 X - remove plugins tab in settings window

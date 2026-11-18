@@ -69,9 +69,6 @@ common_deps = [
   libxml, tdb, totem_plparser,
 ]
 
-check = dependency('check', required: get_option('tests'))
-
-
 have_gnu_fwrite_unlocked = false
 if cc.has_function('fwrite_unlocked')
   have_gnu_fwrite_unlocked = cc.has_header_symbol('stdio.h', 'fwrite_unlocked')
@@ -119,10 +116,6 @@ configure_file(input : 'config.h.meson',
   output : 'config.h',
 configuration : cdata)
 
-summary({'Tests': check.found(),
-        },
-        section: 'General',
-        bool_yn: true)
 configinc = include_directories('.')
 libinc = include_directories('lib')
 metadatainc = include_directories('metadata')
@@ -142,9 +135,5 @@ subdir('backends')
 subdir('sources')
 subdir('widgets')
 subdir('shell')
-
-if check.found()
-  subdir('tests')
-endif
 
 
