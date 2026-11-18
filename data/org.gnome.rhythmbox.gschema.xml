@@ -235,36 +235,6 @@
   </schema>
 
 
-  <enum id="org.gnome.rhythmbox.plugins.replaygain.mode">
-    <value nick="radio" value="0"/>
-    <value nick="album" value="1"/>
-  </enum>
-  <schema id="org.gnome.rhythmbox.plugins.replaygain" path="/org/gnome/rhythmbox/plugins/replaygain/">
-    <key name="limiter" type="b">
-      <default>true</default>
-      <summary>Whether to apply compression to prevent clipping</summary>
-      <description>
-      If set, audio compression will be applied to prevent the output
-      signal from clipping.
-      </description>
-    </key>
-    <key name="preamp" type="d">
-      <default>0.0</default>
-      <summary>Pre-amplification level</summary>
-      <description>
-	The amount of gain to apply to the signal before ReplayGain adjustment
-      </description>
-    </key>
-    <key name="mode" enum="org.gnome.rhythmbox.plugins.replaygain.mode">
-      <default>'radio'</default>
-      <summary>The active ReplayGain adjustment mode</summary>
-      <description>
-        Either 'radio' for equal loudness for all tracks or 'album' for ideal
-	loudness for all tracks.
-      </description>
-    </key>
-  </schema>
-
   <schema id="org.gnome.rhythmbox.plugins.webremote" path="/org/gnome/rhythmbox/plugins/webremote/">
     <key name="listen-port" type="q">
       <default>0</default>
