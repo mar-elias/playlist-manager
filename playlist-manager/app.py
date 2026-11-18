@@ -6,7 +6,13 @@ from __future__ import annotations
 import shlex
 import subprocess
 import sys
+from dataclasses import dataclass
 from pathlib import Path
+
+try:
+    import mutagen
+except ImportError:
+    mutagen = None
 
 try:
     from PyQt6.QtCore import QMimeDatabase, Qt, QTimer, QUrl, pyqtSignal
@@ -62,6 +68,93 @@ from playlists import (
 from settings import Settings, load_settings, save_settings
 
 _MIME_DB = QMimeDatabase()
+ROLE_INDEX = Qt.ItemDataRole.UserRole
+ROLE_PATH = Qt.ItemDataRole.UserRole + 1
+
+
+@dataclass(frozen=True)
+class TrackInfo:
+    title: str
+    artist: str
+    album: str
+    year: int | None
+    genre: str
+    duration: float | None
+
+    def year_text(self) -> str:
+        return "" if self.year is None else str(self.year)
+
+
+def read_track_info(path: str) -> TrackInfo:
+    file = Path(path)
+    title = file.stem
+    artist = album = genre = ""
+    year = None
+    duration = None
+    if file.is_file() and mutagen is not None:
+        try:
+            audio = mutagen.File(path, easy=True)
+        except Exception:
+            audio = None
+        if audio is not None:
+            title = _tag(audio, "title", "TIT2") or title
+            artist = _tag(audio, "artist", "TPE1")
+            album = _tag(audio, "album", "TALB")
+            year = _year(_tag(audio, "date", "year", "TDRC", "TYER"))
+            genre = _tag(audio, "genre", "TCON")
+            length = getattr(getattr(audio, "info", None), "length", None)
+            if isinstance(length, (int, float)) and length >= 0:
+                duration = float(length)
+    return TrackInfo(title, artist, album, year, genre, duration)
+
+
+def _tag(audio, *keys: str) -> str:
+    for key in keys:
+        try:
+            value = audio.get(key)
+        except Exception:
+            value = None
+        text = _frame_text(value)
+        if text:
+            return text
+    return ""
+
+
+def _frame_text(value) -> str:
+    if not value:
+        return ""
+    if isinstance(value, (list, tuple)):
+        for item in value:
+            text = _frame_text(item)
+            if text:
+                return text
+        return ""
+    if hasattr(value, "text"):
+        return _frame_text(value.text)
+    return str(value).strip()
+
+
+def _year(text: str) -> int | None:
+    digits = ""
+    for char in text:
+        if char.isdigit():
+            digits += char
+            if len(digits) == 4:
+                return int(digits)
+        elif digits:
+            break
+    return None
+
+
+def format_duration(seconds: float | None) -> str:
+    if seconds is None or seconds < 0:
+        return ""
+    total = int(seconds + 0.5)
+    minutes, secs = divmod(total, 60)
+    hours, minutes = divmod(minutes, 60)
+    if hours:
+        return f"{hours}:{minutes:02d}:{secs:02d}"
+    return f"{minutes}:{secs:02d}"
 
 
 def media_paths_from_urls(urls) -> list[str]:
@@ -104,7 +197,8 @@ class PlaylistList(QListWidget):
         self.setAcceptDrops(True)
         self.setDragDropMode(QAbstractItemView.DragDropMode.DropOnly)
         self.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.setMinimumWidth(220)
+        self.setMinimumWidth(260)
+        self.setStyleSheet("QListWidget { font-size: 14pt; } QListWidget::item { padding: 8px 6px; }")
 
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls():
@@ -129,14 +223,16 @@ class TrackView(QTreeWidget):
     """Track table. Rows reorder inside the playlist, and Dolphin can drop files in."""
 
     files_dropped = pyqtSignal(list, int)
-    reordered = pyqtSignal(list)
+    moved = pyqtSignal(list, int)
     remove_requested = pyqtSignal()
     move_requested = pyqtSignal(int)
 
     def __init__(self):
         super().__init__()
-        self.setColumnCount(3)
-        self.setHeaderLabels(["Name", "Location", ""])
+        self.setColumnCount(9)
+        self.setHeaderLabels(
+            ["#", "Title", "Artist", "Album", "Year", "Genre", "Time", "File name", "Location"]
+        )
         self.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.setRootIsDecorated(False)
@@ -148,10 +244,14 @@ class TrackView(QTreeWidget):
         self.setDragEnabled(True)
         header = self.header()
         header.setStretchLastSection(False)
-        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Interactive)
+        header.setSectionsClickable(True)
+        header.setSortIndicatorShown(True)
+        for column in (0, 4, 6):
+            header.setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
-        self.setColumnWidth(0, 240)
+        for column, width in ((2, 150), (3, 150), (5, 120), (7, 180), (8, 260)):
+            header.setSectionResizeMode(column, QHeaderView.ResizeMode.Interactive)
+            self.setColumnWidth(column, width)
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key.Key_Delete and event.modifiers() == Qt.KeyboardModifier.NoModifier:
@@ -179,25 +279,38 @@ class TrackView(QTreeWidget):
 
     def dropEvent(self, event):
         if event.mimeData().hasUrls():
-            index = self._insert_index(event.position().toPoint())
-            self.files_dropped.emit(list(event.mimeData().urls()), index)
+            index = self._playlist_insert_index(event.position().toPoint())
+            self.files_dropped.emit(list(event.mimeData().urls()), -1 if index is None else index)
             event.acceptProposedAction()
             return
-        super().dropEvent(event)
-        paths = []
-        for row in range(self.topLevelItemCount()):
-            paths.append(self.topLevelItem(row).data(0, Qt.ItemDataRole.UserRole))
-        self.reordered.emit(paths)
+        indexes = self.playlist_indexes(self.selectedItems())
+        if not indexes:
+            event.ignore()
+            return
+        destination = self._playlist_insert_index(event.position().toPoint())
+        self.moved.emit(indexes, -1 if destination is None else destination)
+        event.accept()
 
-    def _insert_index(self, pos) -> int:
+    def playlist_indexes(self, items) -> list[int]:
+        indexes = []
+        for item in items:
+            value = item.data(0, ROLE_INDEX)
+            if isinstance(value, int):
+                indexes.append(value)
+        return sorted(set(indexes))
+
+    def _playlist_insert_index(self, pos) -> int | None:
+        """Playlist index to insert before. None means append to the playlist."""
         item = self.itemAt(pos)
         if item is None:
-            return self.topLevelItemCount()
-        index = self.indexOfTopLevelItem(item)
+            return None
+        playlist_index = item.data(0, ROLE_INDEX)
+        if not isinstance(playlist_index, int):
+            return None
         rect = self.visualItemRect(item)
         if pos.y() > rect.center().y():
-            return index + 1
-        return index
+            return playlist_index + 1
+        return playlist_index
 
 
 class FileDropPage(QWidget):
@@ -294,9 +407,12 @@ class PlaylistWindow(QMainWindow):
         self.tracks: list[str] = []
         self._loading = False
         self._settings_dialog: SettingsDialog | None = None
+        self._tag_cache: dict[str, tuple[int, TrackInfo]] = {}
+        self.sort_column = 0
+        self.sort_descending = False
 
         self.setWindowTitle("Playlist Manager")
-        self.resize(960, 640)
+        self.resize(1180, 640)
         self._build_actions()
         self._build_toolbar()
         self.setStatusBar(QStatusBar())
@@ -309,9 +425,10 @@ class PlaylistWindow(QMainWindow):
         self.track_view.itemDoubleClicked.connect(self.on_track_activated)
         self.track_view.itemSelectionChanged.connect(self.update_actions)
         self.track_view.files_dropped.connect(self.on_track_files)
-        self.track_view.reordered.connect(self.on_tracks_reordered)
+        self.track_view.moved.connect(self.on_tracks_moved)
         self.track_view.remove_requested.connect(self.remove_selected_tracks)
         self.track_view.move_requested.connect(self.move_selected)
+        self.track_view.header().sectionClicked.connect(self.on_column_sorted)
 
         self.empty_page = FileDropPage("Drag audio and video files from Dolphin into this playlist.")
         self.none_page = FileDropPage("Select a playlist, or create a new one.")
@@ -338,7 +455,7 @@ class PlaylistWindow(QMainWindow):
         self.main_pane.addWidget(self.playlist_list)
         self.main_pane.addWidget(track_pane)
         self.main_pane.setStretchFactor(1, 1)
-        self.main_pane.setSizes([240, 720])
+        self.main_pane.setSizes([280, 900])
 
         self.setup_page = FileDropPage("Each playlist is an M3U8 file in the folder you choose.")
         choose = QPushButton("Choose folder")
@@ -513,24 +630,93 @@ class PlaylistWindow(QMainWindow):
     def refresh(self) -> None:
         self.reload_playlists(select=self.current_playlist)
 
+    def _track_info(self, path: str) -> TrackInfo:
+        file = Path(path)
+        try:
+            stamp = file.stat().st_mtime_ns if file.exists() else -1
+        except OSError:
+            stamp = -1
+        cached = self._tag_cache.get(path)
+        if cached is not None and cached[0] == stamp:
+            return cached[1]
+        info = read_track_info(path)
+        self._tag_cache[path] = (stamp, info)
+        return info
+
+    def _sort_value(self, index: int) -> tuple[bool, object]:
+        info = self._track_info(self.tracks[index])
+        path = Path(self.tracks[index])
+        column = self.sort_column
+        if column == 0:
+            return False, index
+        if column == 1:
+            return info.title == "", info.title.casefold()
+        if column == 2:
+            return info.artist == "", info.artist.casefold()
+        if column == 3:
+            return info.album == "", info.album.casefold()
+        if column == 4:
+            return info.year is None, info.year or 0
+        if column == 5:
+            return info.genre == "", info.genre.casefold()
+        if column == 6:
+            return info.duration is None, info.duration or 0
+        if column == 7:
+            return path.name == "", path.name.casefold()
+        location = "" if str(path.parent) in {"", "."} else str(path.parent)
+        return location == "", location.casefold()
+
+    def _display_order(self) -> list[int]:
+        indexes = list(range(len(self.tracks)))
+        indexes.sort(key=self._sort_value)
+        if not self.sort_descending:
+            return indexes
+        present = [index for index in indexes if not self._sort_value(index)[0]]
+        absent = [index for index in indexes if self._sort_value(index)[0]]
+        present.reverse()
+        return present + absent
+
     def show_tracks(self, select: list[int] | None = None) -> None:
         self.track_view.clear()
         missing_color = _error_color(self.track_view)
-        for track in self.tracks:
-            missing = not Path(track).exists()
-            item = QTreeWidgetItem([Path(track).name, track, "Missing" if missing else ""])
-            item.setData(0, Qt.ItemDataRole.UserRole, track)
-            item.setToolTip(0, track)
-            item.setToolTip(1, track)
+        chosen = set(select or [])
+        for playlist_index in self._display_order():
+            track = self.tracks[playlist_index]
+            info = self._track_info(track)
+            path = Path(track)
+            missing = not path.exists()
+            location = "" if str(path.parent) in {"", "."} else str(path.parent)
+            item = QTreeWidgetItem(
+                [
+                    str(playlist_index + 1),
+                    info.title,
+                    info.artist,
+                    info.album,
+                    info.year_text(),
+                    info.genre,
+                    format_duration(info.duration),
+                    path.name,
+                    location,
+                ]
+            )
+            item.setData(0, ROLE_INDEX, playlist_index)
+            item.setData(0, ROLE_PATH, track)
+            item.setTextAlignment(0, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            item.setTextAlignment(4, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            item.setTextAlignment(6, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            for column in range(9):
+                item.setToolTip(column, track)
             if missing:
-                for column in range(3):
+                for column in range(9):
                     item.setForeground(column, missing_color)
             self.track_view.addTopLevelItem(item)
-        if select:
-            for index in select:
-                item = self.track_view.topLevelItem(index)
-                if item is not None:
-                    item.setSelected(True)
+            if playlist_index in chosen:
+                item.setSelected(True)
+        header = self.track_view.header()
+        header.setSortIndicator(
+            self.sort_column,
+            Qt.SortOrder.DescendingOrder if self.sort_descending else Qt.SortOrder.AscendingOrder,
+        )
         if self.current_playlist is None:
             self.track_stack.setCurrentWidget(self.none_page)
             self.setWindowTitle("Playlist Manager")
@@ -571,14 +757,21 @@ class PlaylistWindow(QMainWindow):
             self.show_error(str(exc))
         self.show_tracks()
 
+    def on_column_sorted(self, column: int) -> None:
+        if column == self.sort_column:
+            self.sort_descending = not self.sort_descending
+        else:
+            self.sort_column = column
+            self.sort_descending = False
+        self.show_tracks(select=self.selected_rows())
+
     def on_track_activated(self, item: QTreeWidgetItem, _column: int) -> None:
-        path = item.data(0, Qt.ItemDataRole.UserRole)
+        path = item.data(0, ROLE_PATH)
         if path:
             self.play_paths([path])
 
     def selected_rows(self) -> list[int]:
-        rows = [self.track_view.indexOfTopLevelItem(item) for item in self.track_view.selectedItems()]
-        return sorted(row for row in rows if row >= 0)
+        return self.track_view.playlist_indexes(self.track_view.selectedItems())
 
     def on_new_playlist(self) -> None:
         if self.playlist_directory() is None:
@@ -689,6 +882,20 @@ class PlaylistWindow(QMainWindow):
         rows = self.selected_rows()
         if not rows or self.current_playlist is None:
             return
+        if len(rows) == 1:
+            name = self._track_info(self.tracks[rows[0]]).title or Path(self.tracks[rows[0]]).name
+            question = f"Remove “{name}” from this playlist?"
+        else:
+            question = f"Remove {len(rows)} items from this playlist?"
+        answer = QMessageBox.question(
+            self,
+            "Remove from playlist?",
+            f"{question}\nThe files stay where they are.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Cancel,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
         indexes = set(rows)
         self.tracks = [track for index, track in enumerate(self.tracks) if index not in indexes]
         self._write_current()
@@ -707,15 +914,25 @@ class PlaylistWindow(QMainWindow):
             self.tracks[index], self.tracks[swap] = self.tracks[swap], self.tracks[index]
         self._write_current(select=[index + delta for index in rows])
 
-    def on_tracks_reordered(self, paths: list[str]) -> None:
-        copied = list(paths)
-        QTimer.singleShot(0, lambda copied=copied: self._apply_reorder(copied))
+    def on_tracks_moved(self, indexes: list[int], destination: int) -> None:
+        copied = list(indexes)
+        QTimer.singleShot(0, lambda copied=copied, destination=destination: self._move_indexes(copied, destination))
 
-    def _apply_reorder(self, paths: list[str]) -> None:
-        if self.current_playlist is None:
+    def _move_indexes(self, indexes: list[int], destination: int) -> None:
+        if self.current_playlist is None or not indexes:
             return
-        self.tracks = paths
-        self._write_current()
+        indexes = sorted(set(indexes))
+        if destination < 0:
+            destination = len(self.tracks)
+        moving = [self.tracks[index] for index in indexes]
+        kept = [track for index, track in enumerate(self.tracks) if index not in set(indexes)]
+        insert_at = destination - sum(1 for index in indexes if index < destination)
+        insert_at = max(0, min(insert_at, len(kept)))
+        updated = kept[:insert_at] + moving + kept[insert_at:]
+        if updated == self.tracks:
+            return
+        self.tracks = updated
+        self._write_current(select=list(range(insert_at, insert_at + len(moving))))
 
     def on_playlist_files(self, playlist: str, urls: list) -> None:
         path = Path(playlist) if playlist else self.current_playlist
@@ -746,9 +963,12 @@ class PlaylistWindow(QMainWindow):
             self.toast("No audio or video files in that drop.")
             return
         playlist = self.current_playlist
+        insert_at = None if index is None or index < 0 else index
         QTimer.singleShot(
             0,
-            lambda playlist=playlist, media=media, index=index: self._finish_track_drop(playlist, media, index),
+            lambda playlist=playlist, media=media, insert_at=insert_at: self._finish_track_drop(
+                playlist, media, insert_at
+            ),
         )
 
     def _finish_track_drop(self, playlist: Path, paths: list[str], index: int | None) -> None:
