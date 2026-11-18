@@ -16,7 +16,7 @@
     <p>
       Rhythmbox is a music management application, designed to work well under the GNOME
       desktop. In addition to music stored on your computer, it supports
-      internet music services such as Magnatune.
+      internet music services.
     </p>
     <p>
       Rhythmbox is Free software, based on GTK+ and GStreamer, and is extensible via plugins

@@ -240,35 +240,6 @@
   </schema>
 
 
-  <!-- pygobject's gsettings overrides can't do enums yet
-  <enum id="org.gnome.rhythmbox.plugins.magnatune.audio-format">
-    <value nick="ogg" value="0"/>
-    <value nick="flac" value="1"/>
-    <value nick="wav" value="2"/>
-    <value nick="mp3-vbr" value="3"/>
-    <value nick="mp3-cbr" value="4"/>
-  </enum>
-  <enum id="org.gnome.rhythmbox.plugins.magnatune.account-type">
-    <value nick="none" value="0"/>
-    <value nick="stream" value="1"/>
-    <value nick="download" value="2"/>
-  </enum>
-  -->
-  <schema id="org.gnome.rhythmbox.plugins.magnatune" path="/org/gnome/rhythmbox/plugins/magnatune/">
-    <key name="format" type="s"> <!-- enum="org.gnome.rhythmbox.plugins.magnatune.audio-format" -->
-      <default>'ogg'</default>
-      <summary>Audio format to use for Magnatune downloads</summary>
-      <description>Audio format to use for Magnatune downloads</description>
-    </key>
-    <key name="account-type" type="s"> <!-- enum="org.gnome.rhythmbox.plugins.magnatune.account-type"> -->
-      <default>'none'</default>
-      <summary>Magnatune account type</summary>
-      <description>Magnatune account type</description>
-    </key>
-
-    <child name="source" schema="org.gnome.rhythmbox.source"/>
-  </schema>
-
   <enum id="org.gnome.rhythmbox.plugins.replaygain.mode">
     <value nick="radio" value="0"/>
     <value nick="album" value="1"/>

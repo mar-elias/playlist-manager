@@ -208,7 +208,7 @@ See [enum@ShellUILocation] for the set of locations available.
 
 ### Creating a Source
 
-Creating a new source is fairly simple with Python, but before doing so you need to determine what kind of source it is. Source fall into two main groups: those that contain all the entries of a particular type (e.g. the Radio source showing all stations, and the Magnatune source showing songs from the Magnatune catalogue), and those that contain particular entries (e.g. the play queue or a static playlist).
+Creating a new source is fairly simple with Python, but before doing so you need to determine what kind of source it is. Source fall into two main groups: those that contain all the entries of a particular type (e.g. the Radio source showing all stations), and those that contain particular entries (e.g. the play queue or a static playlist).
 
 For the former, Rhythmbox has a base class, called [class@BrowserSource], which takes care of much of the work and also provides things like the album/artist browsers for free. To use it, do something like the following
 
