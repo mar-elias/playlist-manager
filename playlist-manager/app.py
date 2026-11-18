@@ -198,7 +198,7 @@ class PlaylistList(QListWidget):
         self.setDragDropMode(QAbstractItemView.DragDropMode.DropOnly)
         self.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.setMinimumWidth(260)
-        self.setStyleSheet("QListWidget { font-size: 12pt; } QListWidget::item { padding: 5px 6px; }")
+        self.setStyleSheet("QListWidget { font-size: 12pt; } QListWidget::item { padding: 5px 6px; }") # Size of playlist names
 
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls():
@@ -242,6 +242,12 @@ class TrackView(QTreeWidget):
         self.setDefaultDropAction(Qt.DropAction.MoveAction)
         self.setAcceptDrops(True)
         self.setDragEnabled(True)
+        # Size of playlist items:
+        self.setStyleSheet(
+            "QTreeWidget { font-size: 12pt; } "
+            "QTreeWidget::item { padding-top: 4px; padding-bottom: 4px; } "
+            "QHeaderView { font-size: 10pt; }"
+        )
         header = self.header()
         header.setStretchLastSection(False)
         header.setSectionsClickable(True)
