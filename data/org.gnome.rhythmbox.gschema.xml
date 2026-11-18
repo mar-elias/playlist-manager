@@ -207,11 +207,6 @@
     </key>
   </schema>
 
-  <schema id="org.gnome.rhythmbox.plugins.android" path="/org/gnome/rhythmbox/plugins/android/">
-    <child name='source' schema='org.gnome.rhythmbox.source'/>
-    <child name="encoding" schema="org.gnome.rhythmbox.encoding-settings"/>
-  </schema>
-
   <schema id="org.gnome.rhythmbox.plugins.ipod" path="/org/gnome/rhythmbox/plugins/ipod/">
     <child name="source" schema="org.gnome.rhythmbox.source"/>
     <child name="encoding" schema="org.gnome.rhythmbox.encoding-settings"/>
