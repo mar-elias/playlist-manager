@@ -220,10 +220,9 @@ class PlaylistList(QListWidget):
 
 
 class TrackView(QTreeWidget):
-    """Track table. Rows reorder inside the playlist, and Dolphin can drop files in."""
+    """Track table. New files dropped from Dolphin are appended to the playlist."""
 
-    files_dropped = pyqtSignal(list, int)
-    moved = pyqtSignal(list, int)
+    files_dropped = pyqtSignal(list)
     remove_requested = pyqtSignal()
     move_requested = pyqtSignal(int)
 
@@ -238,10 +237,9 @@ class TrackView(QTreeWidget):
         self.setRootIsDecorated(False)
         self.setIndentation(0)
         self.setAlternatingRowColors(True)
-        self.setDragDropMode(QAbstractItemView.DragDropMode.DragDrop)
-        self.setDefaultDropAction(Qt.DropAction.MoveAction)
+        self.setDragDropMode(QAbstractItemView.DragDropMode.DropOnly)
         self.setAcceptDrops(True)
-        self.setDragEnabled(True)
+        self.setDragEnabled(False)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.setHorizontalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
         # Size of playlist items:
@@ -274,27 +272,17 @@ class TrackView(QTreeWidget):
         if event.mimeData().hasUrls():
             event.acceptProposedAction()
             return
-        super().dragEnterEvent(event)
+        event.ignore()
 
     def dragMoveEvent(self, event):
-        if event.mimeData().hasUrls():
-            event.acceptProposedAction()
-            return
-        super().dragMoveEvent(event)
+        self.dragEnterEvent(event)
 
     def dropEvent(self, event):
-        if event.mimeData().hasUrls():
-            index = self._playlist_insert_index(event.position().toPoint())
-            self.files_dropped.emit(list(event.mimeData().urls()), -1 if index is None else index)
-            event.acceptProposedAction()
-            return
-        indexes = self.playlist_indexes(self.selectedItems())
-        if not indexes:
+        if not event.mimeData().hasUrls():
             event.ignore()
             return
-        destination = self._playlist_insert_index(event.position().toPoint())
-        self.moved.emit(indexes, -1 if destination is None else destination)
-        event.accept()
+        self.files_dropped.emit(list(event.mimeData().urls()))
+        event.acceptProposedAction()
 
     def playlist_indexes(self, items) -> list[int]:
         indexes = []
@@ -303,19 +291,6 @@ class TrackView(QTreeWidget):
             if isinstance(value, int):
                 indexes.append(value)
         return sorted(set(indexes))
-
-    def _playlist_insert_index(self, pos) -> int | None:
-        """Playlist index to insert before. None means append to the playlist."""
-        item = self.itemAt(pos)
-        if item is None:
-            return None
-        playlist_index = item.data(0, ROLE_INDEX)
-        if not isinstance(playlist_index, int):
-            return None
-        rect = self.visualItemRect(item)
-        if pos.y() > rect.center().y():
-            return playlist_index + 1
-        return playlist_index
 
 
 class FileDropPage(QWidget):
@@ -440,7 +415,6 @@ class PlaylistWindow(QMainWindow):
         self.track_view.itemDoubleClicked.connect(self.on_track_activated)
         self.track_view.itemSelectionChanged.connect(self.update_actions)
         self.track_view.files_dropped.connect(self.on_track_files)
-        self.track_view.moved.connect(self.on_tracks_moved)
         self.track_view.remove_requested.connect(self.remove_selected_tracks)
         self.track_view.move_requested.connect(self.move_selected)
         self.track_view.header().sectionClicked.connect(self.on_column_sorted)
@@ -454,8 +428,8 @@ class PlaylistWindow(QMainWindow):
 
         self.empty_page = FileDropPage("Drag audio and video files from Dolphin into this playlist.")
         self.none_page = FileDropPage("Select a playlist, or create a new one.")
-        self.empty_page.files_dropped.connect(lambda urls: self.on_track_files(urls, None))
-        self.none_page.files_dropped.connect(lambda urls: self.on_track_files(urls, None))
+        self.empty_page.files_dropped.connect(self.on_track_files)
+        self.none_page.files_dropped.connect(self.on_track_files)
 
         self.track_stack = QStackedWidget()
         self.track_stack.addWidget(self.track_view)
@@ -962,26 +936,6 @@ class PlaylistWindow(QMainWindow):
             self.tracks[index], self.tracks[swap] = self.tracks[swap], self.tracks[index]
         self._write_current(select=[index + delta for index in rows])
 
-    def on_tracks_moved(self, indexes: list[int], destination: int) -> None:
-        copied = list(indexes)
-        QTimer.singleShot(0, lambda copied=copied, destination=destination: self._move_indexes(copied, destination))
-
-    def _move_indexes(self, indexes: list[int], destination: int) -> None:
-        if self.current_playlist is None or not indexes:
-            return
-        indexes = sorted(set(indexes))
-        if destination < 0:
-            destination = len(self.tracks)
-        moving = [self.tracks[index] for index in indexes]
-        kept = [track for index, track in enumerate(self.tracks) if index not in set(indexes)]
-        insert_at = destination - sum(1 for index in indexes if index < destination)
-        insert_at = max(0, min(insert_at, len(kept)))
-        updated = kept[:insert_at] + moving + kept[insert_at:]
-        if updated == self.tracks:
-            return
-        self.tracks = updated
-        self._write_current(select=list(range(insert_at, insert_at + len(moving))))
-
     def on_playlist_files(self, playlist: str, urls: list) -> None:
         path = Path(playlist) if playlist else self.current_playlist
         if path is None:
@@ -1002,7 +956,7 @@ class PlaylistWindow(QMainWindow):
         if self.current_playlist != playlist:
             self._select_playlist(playlist)
 
-    def on_track_files(self, urls: list, index: int | None) -> None:
+    def on_track_files(self, urls: list) -> None:
         if self.current_playlist is None:
             self.toast("Create a playlist first.")
             return
@@ -1011,17 +965,11 @@ class PlaylistWindow(QMainWindow):
             self.toast("No audio or video files in that drop.")
             return
         playlist = self.current_playlist
-        insert_at = None if index is None or index < 0 else index
-        QTimer.singleShot(
-            0,
-            lambda playlist=playlist, media=media, insert_at=insert_at: self._finish_track_drop(
-                playlist, media, insert_at
-            ),
-        )
+        QTimer.singleShot(0, lambda playlist=playlist, media=media: self._finish_track_drop(playlist, media))
 
-    def _finish_track_drop(self, playlist: Path, paths: list[str], index: int | None) -> None:
+    def _finish_track_drop(self, playlist: Path, paths: list[str]) -> None:
         try:
-            self._add_paths(playlist, paths, index)
+            self._add_paths(playlist, paths, None)
         except (OSError, ValueError) as exc:
             self.show_error(str(exc))
 
