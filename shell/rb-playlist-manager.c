@@ -342,6 +342,9 @@ append_new_playlist_source (RBPlaylistManager *mgr, RBPlaylistSource *source)
 		       source);
 }
 
+static void ensure_recently_played_playlist (RBPlaylistManager *mgr);
+static void rb_playlist_manager_set_dirty (RBPlaylistManager *mgr, gboolean dirty);
+
 /**
  * rb_playlist_manager_load_playlists:
  * @mgr: the #RBPlaylistManager
@@ -394,7 +397,99 @@ rb_playlist_manager_load_playlists (RBPlaylistManager *mgr)
 
 	xmlFreeDoc (doc);
 out:
+	ensure_recently_played_playlist (mgr);
 	g_mutex_unlock (&mgr->priv->saving_mutex);
+}
+
+typedef struct {
+	const char **names;
+	gboolean found;
+} PageNameSearch;
+
+static gboolean
+page_has_name (GtkTreeModel *model,
+	       GtkTreePath *path,
+	       GtkTreeIter *iter,
+	       gpointer data)
+{
+	PageNameSearch *search = data;
+	RBDisplayPage *page = NULL;
+	char *name = NULL;
+	int i;
+
+	gtk_tree_model_get (model, iter,
+			    RB_DISPLAY_PAGE_MODEL_COLUMN_PAGE, &page,
+			    -1);
+	if (page == NULL)
+		return FALSE;
+
+	g_object_get (page, "name", &name, NULL);
+	for (i = 0; search->names[i] != NULL; i++) {
+		if (g_strcmp0 (name, search->names[i]) == 0) {
+			search->found = TRUE;
+			break;
+		}
+	}
+	g_free (name);
+	g_object_unref (page);
+	return search->found;
+}
+
+/* Songs played in the last 7 days, newest first. Matches the stock
+ * default playlist, and is recreated when a saved playlist file no
+ * longer contains it. */
+static void
+ensure_recently_played_playlist (RBPlaylistManager *mgr)
+{
+	RBDisplayPageModel *page_model = NULL;
+	RhythmDB *db;
+	RhythmDBEntryType *song_type;
+	RBSource *playlist;
+	GPtrArray *query;
+	const char *names[3];
+
+	names[0] = "Recently Played";
+	names[1] = _("Recently Played");
+	names[2] = NULL;
+
+	g_object_get (mgr->priv->shell, "display-page-model", &page_model, NULL);
+	if (page_model != NULL) {
+		GtkTreeModel *real_model;
+		PageNameSearch search;
+
+		search.names = names;
+		search.found = FALSE;
+		real_model = gtk_tree_model_filter_get_model (GTK_TREE_MODEL_FILTER (page_model));
+		gtk_tree_model_foreach (real_model, page_has_name, &search);
+		g_object_unref (page_model);
+		if (search.found)
+			return;
+	}
+
+	g_object_get (mgr->priv->shell, "db", &db, NULL);
+	song_type = g_object_ref (RHYTHMDB_ENTRY_TYPE_SONG);
+	query = rhythmdb_query_parse (db,
+				      RHYTHMDB_QUERY_PROP_EQUALS,
+				      RHYTHMDB_PROP_TYPE,
+				      song_type,
+				      RHYTHMDB_QUERY_PROP_CURRENT_TIME_WITHIN,
+				      RHYTHMDB_PROP_LAST_PLAYED,
+				      (gulong) (7 * 24 * 60 * 60),
+				      RHYTHMDB_QUERY_END);
+	g_object_unref (song_type);
+
+	playlist = rb_auto_playlist_source_new (mgr->priv->shell, names[1], TRUE);
+	rb_auto_playlist_source_set_query (RB_AUTO_PLAYLIST_SOURCE (playlist),
+					   query,
+					   RHYTHMDB_QUERY_MODEL_LIMIT_NONE,
+					   NULL,
+					   "LastPlayed",
+					   GTK_SORT_DESCENDING);
+	rhythmdb_query_free (query);
+	g_object_unref (db);
+
+	append_new_playlist_source (mgr, RB_PLAYLIST_SOURCE (playlist));
+	rb_playlist_manager_set_dirty (mgr, TRUE);
 }
 
 static void

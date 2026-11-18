@@ -89,8 +89,10 @@ typedef enum
 	RHYTHMDB_QUERY_PROP_YEAR_LESS,
 } RhythmDBQueryType;
 
-/* If you modify this enum, don't forget to modify rhythmdb_prop_get_type */
-typedef enum _RhythmDBPropType
+/* If you modify this enum, don't forget to modify rhythmdb_prop_get_type.
+ * RhythmDBPropType is already typedef'd in rhythmdb-entry-type.h.
+ */
+enum _RhythmDBPropType
 {
 	RHYTHMDB_PROP_TYPE = 0,
 	RHYTHMDB_PROP_ENTRY_ID,
@@ -171,7 +173,7 @@ typedef enum _RhythmDBPropType
 	RHYTHMDB_PROP_TITLE_SORTNAME_FOLDED,
 	
 	RHYTHMDB_NUM_PROPERTIES
-} RhythmDBPropType;
+};
 
 /* commonly used extra entry metadata */
 #define RHYTHMDB_PROP_STREAM_SONG_TITLE		"rb:stream-song-title"

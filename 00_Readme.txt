@@ -20,7 +20,7 @@ sudo apt install gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0
 - For mp4 files, show a monitor next to files, open them in vlc
 - Option to export/import playlists
 X - remove all radio tabs
-- remove the rest of plugins
+X - remove the rest of plugins
 - restore recently played tab
 - make sure tags are written to files
-- remove plugins tab in settings window
+X - remove plugins tab in settings window
