@@ -15,8 +15,8 @@ except ImportError:
     mutagen = None
 
 try:
-    from PyQt6.QtCore import QByteArray, QMimeDatabase, Qt, QTimer, QUrl, pyqtSignal
-    from PyQt6.QtGui import QColor, QIcon, QKeySequence, QPainter, QPixmap
+    from PyQt6.QtCore import QByteArray, QMimeDatabase, QRect, Qt, QTimer, QUrl, pyqtSignal
+    from PyQt6.QtGui import QColor, QIcon, QKeySequence, QPainter, QPalette, QPixmap
     from PyQt6.QtSvg import QSvgRenderer
     from PyQt6.QtWidgets import (
         QAbstractItemView,
@@ -39,9 +39,11 @@ try:
         QSplitter,
         QStackedWidget,
         QStatusBar,
-        QToolButton,
         QStyle,
+        QStyledItemDelegate,
+        QStyleOptionViewItem,
         QToolBar,
+        QToolButton,
         QTreeWidget,
         QTreeWidgetItem,
         QVBoxLayout,
@@ -72,6 +74,7 @@ from settings import Settings, config_file, load_settings, save_settings
 _MIME_DB = QMimeDatabase()
 ROLE_INDEX = Qt.ItemDataRole.UserRole
 ROLE_PATH = Qt.ItemDataRole.UserRole + 1
+ROLE_VIDEO = Qt.ItemDataRole.UserRole + 2
 
 
 @dataclass(frozen=True)
@@ -287,6 +290,37 @@ class PlaylistList(QListWidget):
         event.acceptProposedAction()
 
 
+class TitleDelegate(QStyledItemDelegate):
+    """Draws the video icon at the end of the title, after the text."""
+
+    _ICON = 16
+    _GAP = 6
+
+    def paint(self, painter, option, index):
+        if not index.data(ROLE_VIDEO):
+            super().paint(painter, option, index)
+            return
+        widget = option.widget
+        style = widget.style() if widget is not None else QApplication.style()
+        background = QStyleOptionViewItem(option)
+        self.initStyleOption(background, index)
+        background.icon = QIcon()
+        background.features &= ~QStyleOptionViewItem.ViewItemFeature.HasDecoration
+        background.text = ""
+        style.drawControl(QStyle.ControlElement.CE_ItemViewItem, background, painter, widget)
+
+        text = QStyleOptionViewItem(background)
+        text.text = index.data(Qt.ItemDataRole.DisplayRole) or ""
+        text.state &= ~QStyle.StateFlag.State_HasFocus
+        full = QRect(option.rect)
+        text.rect = QRect(full.x(), full.y(), max(0, full.width() - self._ICON - self._GAP), full.height())
+        style.drawControl(QStyle.ControlElement.CE_ItemViewItem, text, painter, widget)
+
+        color = background.palette.color(QPalette.ColorRole.Text)
+        icon_rect = QRect(full.right() - self._ICON + 1, full.top(), self._ICON, full.height())
+        video_icon(color).paint(painter, icon_rect, Qt.AlignmentFlag.AlignCenter)
+
+
 class TrackView(QTreeWidget):
     """Track table. New files dropped from Dolphin are appended to the playlist."""
 
@@ -323,6 +357,7 @@ class TrackView(QTreeWidget):
         header.setMinimumSectionSize(24)
         for column in range(self.columnCount()):
             header.setSectionResizeMode(column, QHeaderView.ResizeMode.Interactive)
+        self.setItemDelegateForColumn(1, TitleDelegate(self))
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key.Key_Delete and event.modifiers() == Qt.KeyboardModifier.NoModifier:
@@ -792,7 +827,7 @@ class PlaylistWindow(QMainWindow):
             item.setData(0, ROLE_INDEX, playlist_index)
             item.setData(0, ROLE_PATH, track)
             if is_video(path):
-                item.setIcon(1, video_icon(self.track_view.palette().color(self.track_view.foregroundRole())))
+                item.setData(1, ROLE_VIDEO, True)
             item.setTextAlignment(0, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             item.setTextAlignment(4, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             item.setTextAlignment(6, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
