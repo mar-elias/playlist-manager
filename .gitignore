@@ -3,4 +3,6 @@
 *.kate-swp
 _install/
 _build/
+.directory
+
 database/

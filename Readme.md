@@ -1,4 +1,4 @@
-# Playlist Manager
+# Mar-Elias Playlist-Manager
 A minimal local playlist manager which uses VLC.
 
 Playlists are M3U8 files saved in a folder chosen in Settings.
