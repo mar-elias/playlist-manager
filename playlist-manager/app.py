@@ -15,8 +15,9 @@ except ImportError:
     mutagen = None
 
 try:
-    from PyQt6.QtCore import QMimeDatabase, Qt, QTimer, QUrl, pyqtSignal
-    from PyQt6.QtGui import QColor, QKeySequence
+    from PyQt6.QtCore import QByteArray, QMimeDatabase, Qt, QTimer, QUrl, pyqtSignal
+    from PyQt6.QtGui import QColor, QIcon, QKeySequence, QPainter, QPixmap
+    from PyQt6.QtSvg import QSvgRenderer
     from PyQt6.QtWidgets import (
         QAbstractItemView,
         QApplication,
@@ -54,6 +55,7 @@ except ImportError:
     raise SystemExit(1)
 
 from playlists import (
+    MEDIA_SUFFIXES,
     create_playlist,
     delete_playlist,
     export_playlist,
@@ -171,6 +173,27 @@ def media_paths_from_urls(urls) -> list[str]:
     return paths
 
 
+VIDEO_SUFFIXES = frozenset(
+    {
+        ".3gp",
+        ".avi",
+        ".flv",
+        ".m2ts",
+        ".m4v",
+        ".mkv",
+        ".mov",
+        ".mp4",
+        ".mpeg",
+        ".mpg",
+        ".mts",
+        ".ogv",
+        ".ts",
+        ".webm",
+        ".wmv",
+    }
+)
+
+
 def _is_media(path: Path) -> bool:
     if not path.is_file():
         return False
@@ -178,6 +201,51 @@ def _is_media(path: Path) -> bool:
         return True
     name = _MIME_DB.mimeTypeForFile(str(path)).name()
     return name.startswith("audio/") or name.startswith("video/")
+
+
+def is_video(path: Path) -> bool:
+    suffix = path.suffix.lower()
+    if suffix in VIDEO_SUFFIXES:
+        return True
+    if suffix in MEDIA_SUFFIXES:
+        return False
+    return _MIME_DB.mimeTypeForFile(str(path)).name().startswith("video/")
+
+
+# Adwaita symbolic icon named video-display-symbolic, the mark Rhythmbox draws
+# beside a video file. Recolored to the row text so it stays visible on a dark theme.
+_VIDEO_DISPLAY_SVG = (
+    '<svg height="16" viewBox="0 0 16 16" width="16" xmlns="http://www.w3.org/2000/svg">'
+    '<path d="m 3 0 c -1.660156 0 -3 1.339844 -3 3 v 7 c 0 1.660156 1.339844 3 3 3 '
+    "h 10 c 1.660156 0 3 -1.339844 3 -3 v -7 c 0 -1.660156 -1.339844 -3 -3 -3 z "
+    "m 0 2 h 10 c 0.554688 0 1 0.445312 1 1 v 7 c 0 0.554688 -0.445312 1 -1 1 "
+    "h -10 c -0.554688 0 -1 -0.445312 -1 -1 v -7 c 0 -0.554688 0.445312 -1 1 -1 z "
+    'm 2 12 c -1.105469 0 -2 0.894531 -2 2 h 10 c 0 -1.105469 -0.894531 -2 -2 -2 z m 0 0" '
+    'fill="{fill}"/></svg>'
+)
+_video_icons: dict[int, QIcon] = {}
+
+
+def video_icon(color: QColor) -> QIcon:
+    key = color.rgba()
+    cached = _video_icons.get(key)
+    if cached is not None:
+        return cached
+    svg = _VIDEO_DISPLAY_SVG.format(fill=color.name())
+    renderer = QSvgRenderer(QByteArray(svg.encode("utf-8")))
+    icon = QIcon()
+    if renderer.isValid():
+        for size in (16, 32):
+            pixmap = QPixmap(size, size)
+            pixmap.fill(Qt.GlobalColor.transparent)
+            painter = QPainter(pixmap)
+            renderer.render(painter)
+            painter.end()
+            icon.addPixmap(pixmap)
+    if icon.isNull():
+        icon = QIcon.fromTheme("video-display-symbolic")
+    _video_icons[key] = icon
+    return icon
 
 
 def _error_color(widget: QWidget) -> QColor:
@@ -723,6 +791,8 @@ class PlaylistWindow(QMainWindow):
             )
             item.setData(0, ROLE_INDEX, playlist_index)
             item.setData(0, ROLE_PATH, track)
+            if is_video(path):
+                item.setIcon(1, video_icon(self.track_view.palette().color(self.track_view.foregroundRole())))
             item.setTextAlignment(0, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             item.setTextAlignment(4, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             item.setTextAlignment(6, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
