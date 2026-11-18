@@ -97,45 +97,6 @@ rb_builder_load (const char *file, gpointer user_data)
 }
 
 /**
- * rb_builder_load_plugin_file:
- * @plugin: #RBPlugin instance
- * @file: name of file to load
- * @user_data: user data to pass to autoconnected signal handlers
- *
- * Like #rb_builder_load, except it finds files associated with
- * plugins as well as those in the core data directories.
- *
- * Return value: (transfer full): #GtkBuilder object built from the file
- */
-GtkBuilder *
-rb_builder_load_plugin_file (GObject *plugin, const char *file, gpointer user_data)
-{
-	char *path = NULL;
-	GtkBuilder *builder;
-	GBytes *bytes;
-
-	path = rb_find_plugin_resource (plugin, file);
-	bytes = g_resources_lookup_data (path, G_RESOURCE_LOOKUP_FLAGS_NONE, NULL);
-	if (bytes != NULL) {
-		g_bytes_unref (bytes);
-	} else {
-		g_free (path);
-		path = NULL;
-	}
-	if (path == NULL) {
-		path = rb_find_plugin_data_file (plugin, file);
-		if (path == NULL) {
-			return NULL;
-		}
-	}
-
-	builder = rb_builder_load (path, user_data);
-	g_free (path);
-	return builder;
-}
-
-
-/**
  * rb_builder_boldify_label:
  * @builder: a #GtkBuilder instance
  * @name: name of the label to boldify

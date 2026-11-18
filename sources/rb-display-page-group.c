@@ -91,14 +91,6 @@ rb_display_page_group_add_core_groups (GObject *shell, RBDisplayPageModel *page_
 
 	group = rb_display_page_group_new (shell, "playlists", _("Playlists"), RB_DISPLAY_PAGE_GROUP_CATEGORY_PERSISTENT);
 	rb_display_page_model_add_page (page_model, RB_DISPLAY_PAGE (group), NULL);
-
-	group = rb_display_page_group_new (shell, "devices", _("Devices"), RB_DISPLAY_PAGE_GROUP_CATEGORY_REMOVABLE);
-	rb_display_page_model_add_page (page_model, RB_DISPLAY_PAGE (group), NULL);
-	rb_display_page_group_loaded (group);
-
-	group = rb_display_page_group_new (shell, "shared", _("Shared"), RB_DISPLAY_PAGE_GROUP_CATEGORY_TRANSIENT);
-	rb_display_page_model_add_page (page_model, RB_DISPLAY_PAGE (group), NULL);
-	rb_display_page_group_loaded (group);
 }
 
 /**

@@ -15,7 +15,6 @@ install_headers(rhythmdb_headers, subdir: 'rhythmbox/rhythmdb')
 rhythmdb_sources = files(
   'rb-refstring.c',
   'rhythmdb.c',
-  'rhythmdb-dbus.c',
   'rhythmdb-entry-type.c',
   'rhythmdb-import-job.c',
   'rhythmdb-metadata-cache.c',

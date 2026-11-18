@@ -4,9 +4,6 @@ project('rhythmbox', 'c',
   default_options: ['c_std=gnu89'])
 
 gnome = import('gnome')
-i18n = import('i18n')
-pkg = import('pkgconfig')
-python = import('python')
 
 # plugin API versioning
 # Increment on interface addition, reset on removal
@@ -51,8 +48,6 @@ gio = dependency('gio-2.0', version: '>=' + glib_required, required: true)
 gio_unix = dependency('gio-unix-2.0', version: '>=' + glib_required, required: true)
 glib = dependency('glib-2.0', version: '>=' + glib_required, required: true)
 gobject = dependency('gobject-2.0', version: '>=' + glib_required, required: true)
-girepository = dependency('girepository-2.0', version: '>=' + glib_required, required: false)
-gobject_introspection = dependency('gobject-introspection-1.0', version: '>= 0.10.0', required: true)
 gstreamer = dependency('gstreamer-1.0', version: '>= ' + gstreamer_required, required: true)
 gstreamer_audio = dependency('gstreamer-audio-1.0', version: '>= ' + gstreamer_required, required: true)
 gstreamer_base = dependency('gstreamer-base-1.0', version: '>= ' + gstreamer_required, required: true)
@@ -61,47 +56,27 @@ gstreamer_plugins_base = dependency('gstreamer-plugins-base-1.0', version: '>= '
 gstreamer_pbutils = dependency('gstreamer-pbutils-1.0', version: '>= ' + gstreamer_required, required: true)
 gstreamer_tag = dependency('gstreamer-tag-1.0', version: '>= ' + gstreamer_required, required: true)
 gtk = dependency('gtk+-3.0', version: '>= 3.16.0', required: true)
-json_glib = dependency('json-glib-1.0', required: true)
-libpeas = dependency('libpeas-1.0', version: '>= 0.7.3', required: true)
-libpeas_gtk = dependency('libpeas-gtk-1.0', version: '>= 0.7.3', required: true)
-libsoup = dependency('libsoup-3.0', version: '>= 3.0.7', required: true)
 libxml = dependency('libxml-2.0', version: '>= 2.7.8', required: true)
 pango = dependency('pango', required: true)
 tdb = dependency('tdb', version: '>= 1.2.6', required: true)
 totem_plparser = dependency('totem-plparser', version: '>= 3.2.0', required: true)
-
-gudev = dependency('gudev-1.0', version: '>= 143', required: get_option('gudev'))
-if gudev.found()
-  cdata.set('HAVE_GUDEV', 1)
-endif
-
 
 common_deps = [
   libmath,
   intl, glib, gobject, gio, gio_unix,
   cairo, pango, gdk_pixbuf, gtk,
   gstreamer, gstreamer_audio, gstreamer_base, gstreamer_controller, gstreamer_plugins_base, gstreamer_pbutils, gstreamer_tag,
-  json_glib, libsoup, libxml, tdb, totem_plparser,
-  libpeas, libpeas_gtk,
-  gudev
+  libxml, tdb, totem_plparser,
 ]
 
 check = dependency('check', required: get_option('tests'))
 
-
-libsecret = dependency('libsecret-1', version: '>= 0.18', required: get_option('libsecret'))
-cdata.set('PY_LIBSECRET_ENABLED', libsecret.found())
-cdata.set('WITH_LIBSECRET', libsecret.found())
 
 have_gnu_fwrite_unlocked = false
 if cc.has_function('fwrite_unlocked')
   have_gnu_fwrite_unlocked = cc.has_header_symbol('stdio.h', 'fwrite_unlocked')
 endif
 cdata.set('HAVE_GNU_FWRITE_UNLOCKED', have_gnu_fwrite_unlocked)
-
-# rhythmbox-client interactive mode uses this non-standard function
-have_cfmakeraw = cc.has_function('cfmakeraw', prefix: '#include <termios.h>')
-cdata.set('HAVE_CFMAKERAW', have_cfmakeraw)
 
 gtk_targets = gtk.get_variable(pkgconfig: 'targets').split()
 if gtk_targets.contains('x11')
@@ -134,76 +109,6 @@ datadir = get_option('prefix') / get_option('datadir')
 libdir = get_option('prefix') / get_option('libdir')
 pkgdatadir = datadir / 'rhythmbox'
 
-#################
-# Plugin support
-
-plugindir = libdir / 'rhythmbox' / 'plugins'
-plugindatadir = datadir / 'rhythmbox' / 'plugins'
-
-sampleplugindir = libdir / 'rhythmbox' / 'sample-plugins'
-sampleplugindatadir = datadir / 'rhythmbox' / 'sample-plugins'
-
-enable_python = false
-enable_gir2 = false
-
-if girepository.found() and libpeas.version() > '1.37'
-  enable_gir2 = true
-  cdata.set('USE_GIREPOSITORY2', 1)
-elif girepository.found() and run_command('pkg-config', '--print-requires', 'libpeas-1.0', check: true).stdout().contains('girepository-2')
-  enable_gir2 = true
-  cdata.set('USE_GIREPOSITORY2', 1)
-endif
-
-python_install = python.find_installation('python3', required: get_option('plugins_python'))
-pygobject = dependency('pygobject-3.0', version: '>= 3.0.0', required: get_option('plugins_python'))
-if python_install.found() and pygobject.found()
-  enable_python = true
-
-  if pygobject.version() >= '3.53.0'
-    if not enable_gir2
-      error('cannot mix girepository 1.0 (via libpeas) and 2.0 (via pygobject)')
-    endif
-  elif pygobject.version() >= '3.52.0'
-    error('rhythmbox cannot be used with pygobject 3.52 due to girepository clashes')
-  endif
-endif
-
-
-
-enable_vala = false
-vala_found = add_languages('vala', required: get_option('plugins_vala'), native: false)
-if vala_found
-  enable_vala = true
-  vapi_dir = meson.current_source_dir() / 'bindings' / 'vala'
-  add_project_arguments(['--vapidir', vapi_dir], language: 'vala')
-endif
-
-plugin_headers = ['plugins/rb-plugin-macros.h']
-install_headers(plugin_headers, subdir: 'rhythmbox/plugins')
-
-# FIXME: Move custom_target to i18n.merge_file when gettext acquires plugin support.
-#        http://lists.gnu.org/archive/html/bug-gettext/2017-06/msg00001.html
-msgfmt_plugin_cmd = [
-  find_program('cp'),
-  '@INPUT@',
-  '@OUTPUT@',
-]
-
-##########
-# Plugins
-
-plugins = []
-
-pkg.generate(
-  name: 'rhythmbox',
-  description: 'plugin API for rhythmbox',
-  requires: [glib, gobject, gio, gtk, libsoup, totem_plparser, gstreamer],
-  requires_private: libxml,
-  variables: [
-    'plugin_dir=' + plugindir,
-  ]
-)
-
 gnome.post_install(
   glib_compile_schemas: true,
   gtk_update_icon_cache: true,
@@ -220,34 +125,19 @@ summary({'Tests': check.found(),
         },
         section: 'General',
         bool_yn: true)
-summary({'iPod integration': plugins.contains('ipod'),
-         'libnotify support': plugins.contains('notification'),
-         'GUdev support': gudev.found(),
-         'Python plugin support': enable_python,
-         'Use girepository 2.0': enable_gir2,
-         'Vala plugin support': enable_vala,
-         'Libsecret keyring support': libsecret.found(),
-         'Sample plugins': get_option('sample-plugins'),
-        },
-        section: 'Plugins',
-        bool_yn: true)
-
 configinc = include_directories('.')
 libinc = include_directories('lib')
-mpidinc = include_directories('lib/libmediaplayerid')
 metadatainc = include_directories('metadata')
 rhythmdbinc = include_directories('rhythmdb')
 backendsinc = include_directories('backends', 'backends/gstreamer')
-pluginsinc = include_directories('plugins')
 shellinc = include_directories('shell')
-sourcesinc = include_directories('sources', 'sources/sync')
+sourcesinc = include_directories('sources')
 widgetsinc = include_directories('widgets')
 
 subdir('data')
 subdir('data/icons')
 
 subdir('lib')
-subdir('lib/libmediaplayerid')
 subdir('metadata')
 subdir('rhythmdb')
 subdir('backends')
@@ -255,24 +145,6 @@ subdir('sources')
 subdir('widgets')
 subdir('shell')
 
-foreach p : plugins
-  subdir('plugins' / p)
-endforeach
-if get_option('sample-plugins')
-
-  subdir('sample-plugins/sample')
-  if enable_python
-    subdir('sample-plugins/sample-python')
-  endif
-  if enable_vala
-    subdir('sample-plugins/sample-vala')
-  endif
-endif
-subdir('remote/dbus')
-
-if enable_vala
-  subdir('bindings/vala')
-endif
 if check.found()
   subdir('tests')
 endif

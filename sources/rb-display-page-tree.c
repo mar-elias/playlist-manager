@@ -49,7 +49,6 @@
 #include "rb-auto-playlist-source.h"
 #include "rb-static-playlist-source.h"
 #include "rb-play-queue-source.h"
-#include "rb-device-source.h"
 #include "rb-builder-helpers.h"
 #include "rb-application.h"
 
@@ -94,7 +93,6 @@ struct _RBDisplayPageTreePrivate
 	guint expand_rows_id;
 
 	GSimpleAction *remove_action;
-	GSimpleAction *eject_action;
 
 	GdkPixbuf *blank_pixbuf;
 };
@@ -596,17 +594,10 @@ selection_changed_cb (GtkTreeSelection *selection,
 	if (page != NULL) {
 		g_signal_emit (display_page_tree, signals[SELECTED], 0, page);
 
-		if (RB_IS_DEVICE_SOURCE (page) && rb_device_source_can_eject (RB_DEVICE_SOURCE (page))) {
-			g_simple_action_set_enabled (display_page_tree->priv->eject_action, TRUE);
-		} else {
-			g_simple_action_set_enabled (display_page_tree->priv->eject_action, FALSE);
-		}
-
 		g_simple_action_set_enabled (display_page_tree->priv->remove_action, rb_display_page_can_remove (page));
 		g_object_unref (page);
 	} else {
 		g_simple_action_set_enabled (display_page_tree->priv->remove_action, FALSE);
-		g_simple_action_set_enabled (display_page_tree->priv->eject_action, FALSE);
 	}
 }
 
@@ -649,22 +640,6 @@ remove_action_cb (GSimpleAction *action, GVariant *parameter, gpointer user_data
 		g_object_unref (page);
 	}
 }
-
-static void
-eject_action_cb (GSimpleAction *action, GVariant *parameter, gpointer user_data)
-{
-	RBDisplayPage *page = get_selected_page (RB_DISPLAY_PAGE_TREE (user_data));
-	if (page == NULL) {
-		/* nothing */
-	} else if (RB_IS_DEVICE_SOURCE (page) && rb_device_source_can_eject (RB_DEVICE_SOURCE (page))) {
-		rb_device_source_eject (RB_DEVICE_SOURCE (page));
-		g_object_unref (page);
-	} else {
-		rb_debug ("why are we here?");
-		g_object_unref (page);
-	}
-}
-
 
 static gboolean
 display_page_search_equal_func (GtkTreeModel *model,
@@ -801,7 +776,6 @@ impl_constructed (GObject *object)
 
 	GActionEntry actions[] = {
 		{ "display-page-remove", remove_action_cb },
-		{ "display-page-eject", eject_action_cb }
 	};
 
 	RB_CHAIN_GOBJECT_METHOD (rb_display_page_tree_parent_class, constructed, object);
@@ -943,11 +917,9 @@ impl_constructed (GObject *object)
 	app = g_application_get_default ();
 	g_action_map_add_action_entries (G_ACTION_MAP (app), actions, G_N_ELEMENTS (actions), display_page_tree);
 
-	/* disable the remove and eject actions initially */
+	/* disable the remove action initially */
 	display_page_tree->priv->remove_action = G_SIMPLE_ACTION (g_action_map_lookup_action (G_ACTION_MAP (app), "display-page-remove"));
-	display_page_tree->priv->eject_action = G_SIMPLE_ACTION (g_action_map_lookup_action (G_ACTION_MAP (app), "display-page-eject"));
 	g_simple_action_set_enabled (display_page_tree->priv->remove_action, FALSE);
-	g_simple_action_set_enabled (display_page_tree->priv->eject_action, FALSE);
 
 	/* toolbar */
 	display_page_tree->priv->toolbar = gtk_toolbar_new ();
@@ -996,16 +968,6 @@ impl_constructed (GObject *object)
 	g_object_unref (icon);
 
 	gtk_actionable_set_action_name (GTK_ACTIONABLE (button), "app.display-page-remove");
-
-	/* maybe this should be a column in the tree instead.. */
-	button = gtk_button_new ();
-	icon = g_themed_icon_new_with_default_fallbacks ("media-eject-symbolic");
-	image = gtk_image_new_from_gicon (icon, GTK_ICON_SIZE_MENU);
-	gtk_button_set_image (GTK_BUTTON (button), image);
-	gtk_box_pack_start (GTK_BOX (box), button, FALSE, FALSE, 0);
-	g_object_unref (icon);
-	
-	gtk_actionable_set_action_name (GTK_ACTIONABLE (button), "app.display-page-eject");
 
 	display_page_tree->priv->selection = gtk_tree_view_get_selection (GTK_TREE_VIEW (display_page_tree->priv->treeview));
 	g_signal_connect_object (display_page_tree->priv->selection,

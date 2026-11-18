@@ -22,7 +22,6 @@
 		<file preprocess="xml-stripblanks">ui/library-prefs.ui</file>
 		<file preprocess="xml-stripblanks">ui/library-toolbar.ui</file>
 		<file preprocess="xml-stripblanks">ui/main-toolbar.ui</file>
-		<file preprocess="xml-stripblanks">ui/media-player-properties.ui</file>
 		<file preprocess="xml-stripblanks">ui/missing-files-popup.ui</file>
 		<file preprocess="xml-stripblanks">ui/playback-prefs.ui</file>
 		<file preprocess="xml-stripblanks">ui/playlist-menu.ui</file>
@@ -33,10 +32,7 @@
 		<file preprocess="xml-stripblanks">ui/queue-toolbar.ui</file>
 		<file preprocess="xml-stripblanks">ui/song-info-multiple.ui</file>
 		<file preprocess="xml-stripblanks">ui/song-info.ui</file>
-		<file preprocess="xml-stripblanks">ui/sync-dialog.ui</file>
-		<file preprocess="xml-stripblanks">ui/sync-state.ui</file>
 		<file preprocess="xml-stripblanks">ui/task-list-entry.ui</file>
-		<file preprocess="xml-stripblanks">ui/uri-new.ui</file>
 
 		<file preprocess="xml-stripblanks">playlists.xml</file>
 		<file>rhythmbox.gep</file>

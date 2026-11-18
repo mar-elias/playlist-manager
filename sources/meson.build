@@ -1,19 +1,16 @@
 sources_headers = files(
   'rb-auto-playlist-source.h',
   'rb-browser-source.h',
-  'rb-device-source.h',
   'rb-display-page-group.h',
   'rb-display-page-model.h',
   'rb-display-page-tree.h',
   'rb-display-page.h',
-  'rb-media-player-source.h',
   'rb-playlist-source.h',
   'rb-playlist-xml.h',
   'rb-source-search-basic.h',
   'rb-source-search.h',
   'rb-source.h',
   'rb-static-playlist-source.h',
-  'rb-transfer-target.h'
 )
 
 install_headers(sources_headers, subdir: 'rhythmbox/sources')
@@ -21,7 +18,6 @@ install_headers(sources_headers, subdir: 'rhythmbox/sources')
 sources_sources = files(
   'rb-auto-playlist-source.c',
   'rb-browser-source.c',
-  'rb-device-source.c',
   'rb-display-page-group.c',
   'rb-display-page-menu.c',
   'rb-display-page-model.c',
@@ -29,7 +25,6 @@ sources_sources = files(
   'rb-display-page.c',
   'rb-import-errors-source.c',
   'rb-library-source.c',
-  'rb-media-player-source.c',
   'rb-missing-files-source.c',
   'rb-play-queue-source.c',
   'rb-playlist-source.c',
@@ -37,11 +32,6 @@ sources_sources = files(
   'rb-source-search.c',
   'rb-source.c',
   'rb-static-playlist-source.c',
-  'rb-transfer-target.c',
-  'sync/rb-sync-settings.c',
-  'sync/rb-sync-settings-ui.c',
-  'sync/rb-sync-state.c',
-  'sync/rb-sync-state-ui.c',
 )
 
 sources_c_args = [
@@ -60,7 +50,7 @@ sources_dependencies = [totem_plparser, gstreamer_pbutils, libxml, gtk]
 
 sources_lib = static_library('sources', sources_sources,
   c_args: sources_c_args,
-  include_directories: [configinc, shellinc, sourcesinc, widgetsinc, include_directories('sync')],
+  include_directories: [configinc, shellinc, sourcesinc, widgetsinc],
   dependencies: sources_dependencies + [librb_dep, rhythmdb_dep,
     rbbackends_dep, rbmetadata_dep],
   install: false,

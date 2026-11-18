@@ -41,10 +41,6 @@ const char *	rb_locale_dir		(void);
 
 char *		rb_find_user_data_file	(const char *name);
 char *		rb_find_user_cache_file	(const char *name);
-char *		rb_find_plugin_data_file (GObject *plugin,
-					 const char *name);
-char *		rb_find_plugin_resource (GObject *plugin,
-					 const char *name);
 
 char *		rb_canonicalise_uri	(const char *uri);
 

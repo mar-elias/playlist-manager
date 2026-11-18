@@ -12,7 +12,6 @@ widgets_headers = files(
   'rb-segmented-bar.h',
   'rb-song-info.h',
   'rb-source-toolbar.h',
-  'rb-uri-dialog.h',
 )
 
 install_headers(widgets_headers, subdir: 'rhythmbox/widgets')
@@ -44,7 +43,6 @@ widgets_sources = files(
   'rb-song-info.c',
   'rb-source-toolbar.c',
   'rb-task-list-display.c',
-  'rb-uri-dialog.c',
 )
 
 
@@ -53,26 +51,16 @@ widgets_c_args = [
   '-DG_LOG_DOMAIN="Rhythmbox"',
 ]
 
-widgets_dependencies = [gtk, gdk_pixbuf, cairo, pango, gstreamer_pbutils, libsoup]
+widgets_dependencies = [gtk, gdk_pixbuf, cairo, pango, gstreamer_pbutils]
 
 rbwidgets_lib = static_library('rbwidgets',
   widgets_sources,
   dependencies: widgets_dependencies + [librb_dep, rhythmdb_dep, rbmetadata_dep,
   rbbackends_dep, sources_dep],
-  include_directories: [pluginsinc, shellinc, widgetsinc])
+  include_directories: [shellinc, widgetsinc])
 
 rbwidgets_dep = declare_dependency(
   link_with: rbwidgets_lib,
   dependencies: widgets_dependencies,
   include_directories: include_directories('.'),
 )
-
-# These are interactive UI tests.
-test_rb_segmented_bar = executable('test-rb-segmented-bar', 'test-rb-segmented-bar.c',
-  dependencies: [rbwidgets_dep, librb_dep],
-  include_directories: [sourcesinc, rhythmdbinc])
-
-test_uri_dialog_resources = gnome.compile_resources('test-uri-dialog-resources', 'test-uri-dialog.gresource.xml',
-  source_dir: ['../data'])
-test_uri_dialog = executable('test-uri-dialog', ['test-uri-dialog.c', test_uri_dialog_resources],
-  dependencies: [rbwidgets_dep, librb_dep])

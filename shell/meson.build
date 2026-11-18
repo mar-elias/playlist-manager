@@ -8,7 +8,6 @@ shell_headers = files(
   'rb-shell-player.h',
   'rb-shell-preferences.h',
   'rb-playlist-manager.h',
-  'rb-removable-media-manager.h',
   'rb-history.h',
   'rb-play-order.h',
   'rb-task-list.h',
@@ -36,7 +35,6 @@ shell_sources = files(
   'rb-play-order-random-equal-weights.c',
   'rb-play-order-shuffle.c',
   'rb-playlist-manager.c',
-  'rb-removable-media-manager.c',
   'rb-shell.c',
   'rb-shell-clipboard.c',
   'rb-shell-player.c',
@@ -58,24 +56,14 @@ shell_c_args = [
 ]
 
 rhythmbox_core_include_directories = [
-  configinc, libinc, mpidinc, metadatainc, rhythmdbinc, backendsinc, pluginsinc,
+  configinc, libinc, metadatainc, rhythmdbinc, backendsinc,
   sourcesinc, widgetsinc, include_directories('.'),
 ]
 
 rhythmbox_core_deps = [
-  common_deps, mediaplayerid_dep, librb_dep, rhythmdb_dep, rbbackends_dep, rbmetadata_dep,
+  common_deps, librb_dep, rhythmdb_dep, rbbackends_dep, rbmetadata_dep,
   rbwidgets_dep, sources_dep
 ]
-
-if enable_python
-  rhythmbox_core_deps += [pygobject]
-endif
-
-if enable_gir2
-  rhythmbox_core_deps += [girepository]
-else
-  rhythmbox_core_deps += [gobject_introspection]
-endif
 
 librhythmbox_core = shared_library('rhythmbox-core',
   shell_sources,
@@ -91,26 +79,6 @@ rhythmbox_core_dep = declare_dependency(
   link_with: librhythmbox_core,
   dependencies: common_deps,
   include_directories: rhythmbox_core_include_directories,
-)
-
-rb_gir = gnome.generate_gir(librhythmbox_core,
-  dependencies: common_deps,
-  link_with: [],
-  extra_args: [ '--accept-unprefixed'],
-  sources: lib_headers + lib_sources +
-    backends_sources + backends_headers +
-    metadata_sources + metadata_headers +
-    rhythmdb_sources + rhythmdb_headers +
-    shell_sources + shell_headers +
-    sources_sources + sources_headers +
-    widgets_sources + widgets_headers,
-  namespace: 'RB',
-  nsversion: '3.0',
-  identifier_prefix: 'RB',
-  symbol_prefix: 'rb_',
-  includes: ['GObject-2.0', 'Gio-2.0', 'Gtk-3.0', 'Gst-1.0',
-    'GstPbutils-1.0', 'libxml2-2.0', mpid_gir[0]],
-  install: true,
 )
 
 # set rpath on the rhythmbox binary if we're installing inside
@@ -138,7 +106,6 @@ endif
 executable('rhythmbox', 'main.c',
   dependencies: [ rhythmbox_core_dep ],
   c_args: shell_c_args,
-  include_directories: [ pluginsinc ],
   install: true,
 
   install_rpath: rpath

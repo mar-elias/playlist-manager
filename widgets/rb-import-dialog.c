@@ -40,7 +40,6 @@
 #include "rb-cut-and-paste-code.h"
 #include "rb-search-entry.h"
 #include "rhythmdb-entry-type.h"
-#include "rb-device-source.h"
 #include "rb-file-helpers.h"
 #include "rb-task-list.h"
 #include "rhythmdb-import-job.h"
@@ -357,25 +356,9 @@ start_deferred_scan (RhythmDBImportJob *job, int total, RBImportDialog *dialog)
 }
 
 static void
-device_info_bar_response_cb (GtkInfoBar *bar, gint response, RBImportDialog *dialog)
-{
-	RBSource *source;
-	const char *uri;
-
-	hide_import_job (dialog);
-	g_signal_emit (dialog, signals[CLOSED], 0);
-	uri = gtk_file_chooser_get_uri (GTK_FILE_CHOOSER (dialog->priv->file_chooser));
-	source = rb_shell_guess_source_for_uri (dialog->priv->shell, uri);
-	rb_shell_activate_source (dialog->priv->shell, source, FALSE, NULL);
-}
-
-
-static void
 current_folder_changed_cb (GtkFileChooser *chooser, RBImportDialog *dialog)
 {
 	GSettings *settings;
-	RBSource *source;
-	GtkWidget *label;
 	const char *uri;
 	char **locations;
 	int i;
@@ -391,41 +374,6 @@ current_folder_changed_cb (GtkFileChooser *chooser, RBImportDialog *dialog)
 	}
 
 	clear_info_bar (dialog);
-
-	source = rb_shell_guess_source_for_uri (dialog->priv->shell, uri);
-	if (source != NULL) {
-		if (RB_IS_DEVICE_SOURCE (source)) {
-			char *msg;
-			char *name;
-			GtkWidget *content;
-
-			rhythmdb_entry_delete_by_type (dialog->priv->db, dialog->priv->entry_type);
-			rhythmdb_entry_delete_by_type (dialog->priv->db, dialog->priv->ignore_type);
-			rhythmdb_commit (dialog->priv->db);
-
-			dialog->priv->info_bar = gtk_info_bar_new ();
-			g_object_set (dialog->priv->info_bar, "hexpand", TRUE, NULL);
-
-			g_object_get (source, "name", &name, NULL);
-
-			/* this isn't a terribly helpful message. */
-			msg = g_strdup_printf (_("The location you have selected is on the device %s."), name);
-			label = gtk_label_new (msg);
-			g_free (msg);
-			content = gtk_info_bar_get_content_area (GTK_INFO_BAR (dialog->priv->info_bar));
-			gtk_container_add (GTK_CONTAINER (content), label);
-
-			msg = g_strdup_printf (_("Show %s"), name);
-			gtk_info_bar_add_button (GTK_INFO_BAR (dialog->priv->info_bar), msg, GTK_RESPONSE_ACCEPT);
-			g_free (msg);
-
-			g_signal_connect (dialog->priv->info_bar, "response", G_CALLBACK (device_info_bar_response_cb), dialog);
-
-			gtk_widget_show_all (dialog->priv->info_bar);
-			gtk_container_add (GTK_CONTAINER (dialog->priv->info_bar_container), dialog->priv->info_bar);
-			return;
-		}
-	}
 
 	/* disable copy if the selected location is already inside the library */
 	settings = g_settings_new ("org.gnome.rhythmbox.rhythmdb");

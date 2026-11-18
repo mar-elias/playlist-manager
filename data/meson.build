@@ -1,4 +1,4 @@
-desktop_files = [ 'org.gnome.Rhythmbox3.desktop', 'org.gnome.Rhythmbox3.device.desktop' ]
+desktop_files = [ 'org.gnome.Rhythmbox3.desktop' ]
 foreach name : desktop_files
   configure_file(
     input: name + '.in',
@@ -8,19 +8,6 @@ foreach name : desktop_files
     install_dir: datadir / 'applications',
   )
 endforeach
-
-service_conf = configuration_data()
-service_conf.set('bindir', get_option('prefix') / get_option('bindir'))
-
-service = 'org.gnome.Rhythmbox3.service'
-
-configure_file(
-  input: service + '.in',
-  output: service,
-  install: true,
-  install_dir: datadir / 'dbus-1/services',
-  configuration: service_conf
-)
 
 install_data('org.gnome.rhythmbox.gschema.xml',
   install_dir: datadir / 'glib-2.0' / 'schemas')
@@ -44,7 +31,6 @@ install_data('rhythmbox.gep',
 
 mans = [
   'rhythmbox.1',
-  'rhythmbox-client.1'
 ]
 
 install_man(mans)

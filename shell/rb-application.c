@@ -62,8 +62,6 @@ struct _RBApplicationPrivate
 {
 	RBShell *shell;
 
-	GtkWidget *plugins;
-
 	GHashTable *shared_menus;
 	GHashTable *plugin_menus;
 
@@ -71,7 +69,6 @@ struct _RBApplicationPrivate
 	gboolean no_update;
 	gboolean no_registration;
 	gboolean dry_run;
-	gboolean disable_plugins;
 	char *rhythmdb_file;
 	char *playlists_file;
 
@@ -307,7 +304,6 @@ impl_startup (GApplication *app)
 				    "dry-run", rb->priv->dry_run,
 				    "rhythmdb-file", rb->priv->rhythmdb_file,
 				    "playlists-file", rb->priv->playlists_file,
-				    "disable-plugins", rb->priv->disable_plugins,
 				    NULL));
 }
 
@@ -522,7 +518,6 @@ rb_application_run (RBApplication *app, int argc, char **argv)
 		{ "no-update",	       0, 0, G_OPTION_ARG_NONE,         &app->priv->no_update, N_("Do not update the library with file changes"), NULL },
 		{ "no-registration", 'n', 0, G_OPTION_ARG_NONE,         &app->priv->no_registration, N_("Do not register the shell"), NULL },
 		{ "dry-run",	       0, 0, G_OPTION_ARG_NONE,         &app->priv->dry_run,         N_("Don't save any data permanently (implies --no-registration)"), NULL },
-		{ "disable-plugins",   0, 0, G_OPTION_ARG_NONE,		&app->priv->disable_plugins, N_("Disable loading of plugins"), NULL },
 		{ "rhythmdb-file",     0, 0, G_OPTION_ARG_STRING,       &app->priv->rhythmdb_file,   N_("Path for database file to use"), NULL },
 		{ "playlists-file",    0, 0, G_OPTION_ARG_STRING,       &app->priv->playlists_file,   N_("Path for playlists file to use"), NULL },
 		{ "version",           0, G_OPTION_FLAG_NO_ARG, G_OPTION_ARG_CALLBACK, show_version_cb, N_("Show the version of the program"), NULL },

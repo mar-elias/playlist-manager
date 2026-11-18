@@ -47,19 +47,6 @@
 #include <gdk/gdk.h>
 #include <gtk/gtk.h>
 
-#ifdef USE_GIREPOSITORY2
-#include <girepository/girepository.h>
-#define g_irepository_require_private	gi_repository_require_private
-#define g_irepository_require		gi_repository_require
-/* who cares about reference counts for a global singleton */
-#define g_irepository_get_default	gi_repository_dup_default
-#else
-#include <girepository.h>
-#endif
-
-#include <libpeas/peas.h>
-#include <libpeas-gtk/peas-gtk.h>
-
 #include <gst/gst.h>
 
 #ifdef HAVE_MMKEYS
@@ -76,7 +63,6 @@
 #include "rb-file-helpers.h"
 #include "rb-source.h"
 #include "rb-playlist-manager.h"
-#include "rb-removable-media-manager.h"
 #include "rb-track-transfer-queue.h"
 #include "rb-shell-clipboard.h"
 #include "rb-shell-player.h"
@@ -154,7 +140,6 @@ static void rb_shell_db_save_error_cb (RhythmDB *db,
 
 static void rb_shell_playlist_added_cb (RBPlaylistManager *mgr, RBSource *source, RBShell *shell);
 static void rb_shell_playlist_created_cb (RBPlaylistManager *mgr, RBSource *source, RBShell *shell);
-static void rb_shell_medium_added_cb (RBRemovableMediaManager *mgr, RBSource *source, RBShell *shell);
 static void rb_shell_display_page_deleted_cb (RBDisplayPage *page, RBShell *shell);
 static void rb_shell_set_window_title (RBShell *shell, const char *window_title);
 static void rb_shell_player_window_title_changed_cb (RBShellPlayer *player,
@@ -198,7 +183,6 @@ enum
 	PROP_ACCEL_GROUP,
 	PROP_CLIPBOARD,
 	PROP_PLAYLIST_MANAGER,
-	PROP_REMOVABLE_MEDIA_MANAGER,
 	PROP_SHELL_PLAYER,
 	PROP_WINDOW,
 	PROP_PREFS,
@@ -210,7 +194,6 @@ enum
 	PROP_VISIBILITY,
 	PROP_TRACK_TRANSFER_QUEUE,
 	PROP_AUTOSTARTED,
-	PROP_DISABLE_PLUGINS,
 	PROP_TASK_LIST
 };
 
@@ -265,7 +248,6 @@ struct _RBShellPrivate
 	gboolean no_update;
 	gboolean dry_run;
 	gboolean autostarted;
-	gboolean disable_plugins;
 	char *rhythmdb_file;
 	char *playlists_file;
 
@@ -276,7 +258,6 @@ struct _RBShellPrivate
 	RBShellClipboard *clipboard_shell;
 	RBHeader *header;
 	RBPlaylistManager *playlist_manager;
-	RBRemovableMediaManager *removable_media_manager;
 	RBTrackTransferQueue *track_transfer_queue;
 	GtkWidget *task_list_display;
 
@@ -288,16 +269,11 @@ struct _RBShellPrivate
 	RBDisplayPage *selected_page;
 
 	GtkWidget *prefs;
-	GtkWidget *plugins;
 
 	char *cached_title;
 	gboolean cached_playing;
 
 	GSettings *settings;
-
-	GSettings *plugin_settings;
-	PeasEngine *plugin_engine;
-	PeasExtensionSet *activatable;
 
 	RBTaskList *task_list;
 };
@@ -693,13 +669,6 @@ construct_sources (RBShell *shell)
 	rb_shell_append_display_page (shell, RB_DISPLAY_PAGE (shell->priv->missing_files_source), page_group);
 	rb_shell_append_display_page (shell, RB_DISPLAY_PAGE (shell->priv->import_errors_source), page_group);
 
-	/* Initialize removable media manager */
-	rb_debug ("shell: creating removable media manager");
-	shell->priv->removable_media_manager = rb_removable_media_manager_new (shell);
-
-	g_signal_connect_object (G_OBJECT (shell->priv->removable_media_manager), "medium_added",
-				 G_CALLBACK (rb_shell_medium_added_cb), shell, 0);
-
 	rb_profile_end ("constructing sources");
 }
 
@@ -770,182 +739,9 @@ construct_load_ui (RBShell *shell)
 	rb_profile_end ("loading ui");
 }
 
-static void
-extension_added_cb (PeasExtensionSet *set, PeasPluginInfo *info, PeasExtension *extension, RBShell *shell)
-{
-	rb_debug ("activating extension %s", peas_plugin_info_get_name (info));
-	peas_extension_call (extension, "activate");
-}
-
-static void
-extension_removed_cb (PeasExtensionSet *set, PeasPluginInfo *info, PeasExtension *extension, RBShell *shell)
-{
-	rb_debug ("deactivating extension %s", peas_plugin_info_get_name (info));
-	peas_extension_call (extension, "deactivate");
-}
-
-static void
-construct_plugins (RBShell *shell)
-{
-	char *typelib_dir;
-	char *plugindir;
-	char *plugindatadir;
-	char **seen_plugins;
-	GPtrArray *new_plugins = NULL;
-	const GList *plugins;
-	const GList *l;
-	GError *error = NULL;
-
-	if (shell->priv->disable_plugins) {
-		return;
-	}
-
-	g_type_ensure (PEAS_GTK_TYPE_PLUGIN_MANAGER);
-
-	rb_profile_start ("loading plugins");
-	shell->priv->plugin_settings = g_settings_new ("org.gnome.rhythmbox.plugins");
-
-	shell->priv->plugin_engine = peas_engine_new ();
-	/* need an #ifdef for this? */
-	peas_engine_enable_loader (shell->priv->plugin_engine, "python3");
-
-	typelib_dir = g_build_filename (LIBDIR,
-					"girepository-1.0",
-					NULL);
-	if (g_irepository_require_private (g_irepository_get_default (),
-					   typelib_dir, "MPID", "3.0", 0, &error) == FALSE) {
-		g_clear_error (&error);
-		if (g_irepository_require (g_irepository_get_default (), "MPID", "3.0", 0, &error) == FALSE) {
-			g_warning ("Could not load MPID typelib: %s", error->message);
-			g_clear_error (&error);
-		}
-	}
-
-	if (g_irepository_require_private (g_irepository_get_default (),
-					   typelib_dir, "RB", "3.0", 0, &error) == FALSE) {
-		g_clear_error (&error);
-		if (g_irepository_require (g_irepository_get_default (), "RB", "3.0", 0, &error) == FALSE) {
-			g_warning ("Could not load RB typelib: %s", error->message);
-			g_clear_error (&error);
-		}
-	}
-	g_free (typelib_dir);
-
-	if (g_irepository_require (g_irepository_get_default (), "Peas", "1.0", 0, &error) == FALSE) {
-		g_warning ("Could not load Peas typelib: %s", error->message);
-		g_clear_error (&error);
-	}
-
-	if (g_irepository_require (g_irepository_get_default (), "PeasGtk", "1.0", 0, &error) == FALSE) {
-		g_warning ("Could not load PeasGtk typelib: %s", error->message);
-		g_clear_error (&error);
-	}
-
-	plugindir = g_build_filename (rb_user_data_dir (), "plugins", NULL);
-	rb_debug ("plugin search path: %s", plugindir);
-	peas_engine_add_search_path (shell->priv->plugin_engine,
-				     plugindir,
-				     plugindir);
-	g_free (plugindir);
-
-	plugindir = g_build_filename (LIBDIR, "rhythmbox", "plugins", NULL);
-	plugindatadir = g_build_filename (DATADIR, "rhythmbox", "plugins", NULL);
-	rb_debug ("plugin search path: %s / %s", plugindir, plugindatadir);
-	peas_engine_add_search_path (shell->priv->plugin_engine,
-				     plugindir,
-				     plugindatadir);
-	g_free (plugindir);
-	g_free (plugindatadir);
-
-
-	shell->priv->activatable = peas_extension_set_new (shell->priv->plugin_engine,
-							   PEAS_TYPE_ACTIVATABLE,
-							   "object", shell,
-							   NULL);
-	g_signal_connect (shell->priv->activatable, "extension-added", G_CALLBACK (extension_added_cb), shell);
-	g_signal_connect (shell->priv->activatable, "extension-removed", G_CALLBACK (extension_removed_cb), shell);
-
-	g_settings_bind (shell->priv->plugin_settings,
-			 "active-plugins",
-			 shell->priv->plugin_engine,
-			 "loaded-plugins",
-			 G_SETTINGS_BIND_DEFAULT);
-
-	seen_plugins = g_settings_get_strv (shell->priv->plugin_settings, "seen-plugins");
-	plugins = peas_engine_get_plugin_list (shell->priv->plugin_engine);
-	for (l = plugins; l != NULL; l = l->next) {
-		PeasPluginInfo *info = PEAS_PLUGIN_INFO (l->data);
-		char *kf_name;
-		char *kf_path;
-		GKeyFile *keyfile;
-
-		/* load builtin plugins, except for the 'rb' utility module, which only
-		 * gets loaded if another plugin needs it.
-		 */
-		if (peas_plugin_info_is_builtin (info) &&
-		    g_strcmp0 (peas_plugin_info_get_module_name (info), "rb") != 0) {
-			peas_engine_load_plugin (shell->priv->plugin_engine, info);
-			continue;
-		}
-
-		/* have we seen this plugin before? */
-		if (rb_str_in_strv (peas_plugin_info_get_module_name (info), (const char **)seen_plugins)) {
-			continue;
-		}
-		if (new_plugins == NULL) {
-			new_plugins = g_ptr_array_new_with_free_func (g_free);
-		}
-		g_ptr_array_add (new_plugins, g_strdup (peas_plugin_info_get_module_name (info)));
-
-		/* it's a new plugin, see if it wants to be enabled */
-		kf_name = g_strdup_printf ("%s.plugin", peas_plugin_info_get_module_name (info));
-		kf_path = g_build_filename (peas_plugin_info_get_module_dir (info), kf_name, NULL);
-		g_free (kf_name);
-
-		keyfile = g_key_file_new ();
-		if (g_key_file_load_from_file (keyfile, kf_path, G_KEY_FILE_NONE, NULL)) {
-			if (g_key_file_get_boolean (keyfile, "RB", "InitiallyEnabled", NULL)) {
-				rb_debug ("loading new plugin %s", peas_plugin_info_get_module_name (info));
-				peas_engine_load_plugin (shell->priv->plugin_engine, info);
-			} else {
-				rb_debug ("new plugin %s not enabled", peas_plugin_info_get_module_name (info));
-			}
-		} else {
-			rb_debug ("couldn't load plugin file %s", kf_path);
-		}
-		g_free (kf_path);
-		g_key_file_free (keyfile);
-	}
-
-	if (new_plugins != NULL) {
-		GPtrArray *update;
-		int i;
-
-		update = g_ptr_array_new_with_free_func (g_free);
-		for (i = 0; i < g_strv_length (seen_plugins); i++) {
-			g_ptr_array_add (update, g_strdup (seen_plugins[i]));
-		}
-		for (i = 0; i < new_plugins->len; i++) {
-			g_ptr_array_add (update, g_strdup (g_ptr_array_index (new_plugins, i)));
-		}
-
-		g_ptr_array_add (update, NULL);
-		g_settings_set_strv (shell->priv->plugin_settings, "seen-plugins", (const char * const *)update->pdata);
-
-		g_ptr_array_free (new_plugins, TRUE);
-		g_ptr_array_free (update, TRUE);
-	}
-
-	g_strfreev (seen_plugins);
-
-	rb_profile_end ("loading plugins");
-}
-
 static gboolean
 _scan_idle (RBShell *shell)
 {
-	rb_removable_media_manager_scan (shell->priv->removable_media_manager);
-
 	if (shell->priv->no_registration == FALSE) {
 		gboolean loaded, scanned;
 		GVariant *state;
@@ -1120,18 +916,6 @@ rb_shell_class_init (RBShellClass *klass)
 							      RB_TYPE_SHELL_PLAYER,
 							      G_PARAM_READABLE));
 	/**
-	 * RBShell:removable-media-manager:
-	 *
-	 * The #RBRemovableMediaManager instance
-	 */
-	g_object_class_install_property (object_class,
-					 PROP_REMOVABLE_MEDIA_MANAGER,
-					 g_param_spec_object ("removable-media-manager",
-							      "RBRemovableMediaManager",
-							      "RBRemovableMediaManager object",
-							      RB_TYPE_REMOVABLE_MEDIA_MANAGER,
-							      G_PARAM_READABLE));
-	/**
 	 * RBShell:window:
 	 *
 	 * The main Rhythmbox window.
@@ -1239,18 +1023,6 @@ rb_shell_class_init (RBShellClass *klass)
 					 g_param_spec_boolean ("autostarted",
 							       "autostarted",
 							       "TRUE if autostarted",
-							       FALSE,
-							       G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
-	/**
-	 * RBShell:disable-plugins:
-	 *
-	 * If %TRUE, disable plugins
-	 */
-	g_object_class_install_property (object_class,
-					 PROP_DISABLE_PLUGINS,
-					 g_param_spec_boolean ("disable-plugins",
-							       "disable-plugins",
-							       "Whether or not to disable plugins",
 							       FALSE,
 							       G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 	/**
@@ -1391,9 +1163,6 @@ rb_shell_set_property (GObject *object,
 	case PROP_AUTOSTARTED:
 		shell->priv->autostarted = g_value_get_boolean (value);
 		break;
-	case PROP_DISABLE_PLUGINS:
-		shell->priv->disable_plugins = g_value_get_boolean (value);
-		break;
 	default:
 		G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
 		break;
@@ -1443,9 +1212,6 @@ rb_shell_get_property (GObject *object,
 	case PROP_SHELL_PLAYER:
 		g_value_set_object (value, shell->priv->player_shell);
 		break;
-	case PROP_REMOVABLE_MEDIA_MANAGER:
-		g_value_set_object (value, shell->priv->removable_media_manager);
-		break;
 	case PROP_SELECTED_PAGE:
 		g_value_set_object (value, shell->priv->selected_page);
 		break;
@@ -1486,9 +1252,6 @@ rb_shell_get_property (GObject *object,
 		break;
 	case PROP_AUTOSTARTED:
 		g_value_set_boolean (value, shell->priv->autostarted);
-		break;
-	case PROP_DISABLE_PLUGINS:
-		g_value_set_boolean (value, shell->priv->disable_plugins);
 		break;
 	case PROP_TASK_LIST:
 		g_value_set_object (value, shell->priv->task_list);
@@ -1562,9 +1325,7 @@ rb_shell_finalize (GObject *object)
 		g_object_unref (shell->priv->playlist_manager);
 	}
 
-	if (shell->priv->removable_media_manager != NULL) {
-		rb_debug ("unreffing removable media manager");
-		g_object_unref (shell->priv->removable_media_manager);
+	if (shell->priv->track_transfer_queue != NULL) {
 		g_object_unref (shell->priv->track_transfer_queue);
 	}
 
@@ -1691,8 +1452,6 @@ rb_shell_constructed (GObject *object)
 	construct_sources (shell);
 
 	construct_load_ui (shell);
-
-	construct_plugins (shell);
 
 	rb_shell_sync_window_state (shell, FALSE);
 
@@ -2106,14 +1865,6 @@ rb_shell_playlist_created_cb (RBPlaylistManager *mgr,
 }
 
 static void
-rb_shell_medium_added_cb (RBRemovableMediaManager *mgr,
-			  RBSource *source,
-			  RBShell *shell)
-{
-	rb_shell_append_display_page (shell, RB_DISPLAY_PAGE (source), RB_DISPLAY_PAGE_GROUP_DEVICES);
-}
-
-static void
 rb_shell_display_page_deleted_cb (RBDisplayPage *page, RBShell *shell)
 {
 
@@ -2454,18 +2205,6 @@ rb_shell_quit (RBShell *shell,
 
 	rb_shell_sync_state (shell);
 
-	if (shell->priv->plugin_engine != NULL) {
-		g_object_unref (shell->priv->plugin_engine);
-		shell->priv->plugin_engine = NULL;
-	}
-	if (shell->priv->activatable != NULL) {
-		g_object_unref (shell->priv->activatable);
-		shell->priv->activatable = NULL;
-	}
-	if (shell->priv->plugin_settings != NULL) {
-		g_object_unref (shell->priv->plugin_settings);
-		shell->priv->plugin_settings = NULL;
-	}
 	/* or maybe just _quit */
 	/* g_application_release (G_APPLICATION (shell->priv->application)); */
 

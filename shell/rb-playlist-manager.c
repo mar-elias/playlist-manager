@@ -31,8 +31,8 @@
  * @short_description: Playlist management object
  *
  * The playlist manager loads and saves the on-disk playlist file, provides
- * UI actions and a DBus interface for dealing with playlists, and internal
- * interfaces for creating playlists.
+ * UI actions for dealing with playlists, and internal interfaces for
+ * creating playlists.
  */
 
 #include "config.h"
@@ -65,40 +65,6 @@
 
 #define RB_PLAYLIST_MGR_VERSION (xmlChar *) "1.0"
 #define RB_PLAYLIST_MGR_PL (xmlChar *) "rhythmdb-playlists"
-
-#define RB_PLAYLIST_MANAGER_IFACE_NAME "org.gnome.Rhythmbox3.PlaylistManager"
-#define RB_PLAYLIST_MANAGER_DBUS_PATH "/org/gnome/Rhythmbox3/PlaylistManager"
-
-static const char *rb_playlist_manager_dbus_spec =
-"<node>"
-"  <interface name='org.gnome.Rhythmbox3.PlaylistManager'>"
-"    <method name='GetPlaylists'>"
-"      <arg type='as' direction='out'/>"
-"    </method>"
-"    <method name='CreatePlaylist'>"
-"      <arg type='s' name='name'/>"
-"    </method>"
-"    <method name='DeletePlaylist'>"
-"      <arg type='s' name='name'/>"
-"    </method>"
-"    <method name='AddToPlaylist'>"
-"      <arg type='s' name='playlist'/>"
-"      <arg type='s' name='uri'/>"
-"    </method>"
-"    <method name='RemoveFromPlaylist'>"
-"      <arg type='s' name='playlist'/>"
-"      <arg type='s' name='uri'/>"
-"    </method>"
-"    <method name='ExportPlaylist'>"
-"      <arg type='s' name='playlist'/>"
-"      <arg type='s' name='uri'/>"
-"      <arg type='b' name='mp3_format'/>"
-"    </method>"
-"    <method name='ImportPlaylist'>"
-"      <arg type='s' name='uri'/>"
-"    </method>"
-"  </interface>"
-"</node>";
 
 static void rb_playlist_manager_class_init (RBPlaylistManagerClass *klass);
 static void rb_playlist_manager_init (RBPlaylistManager *mgr);
@@ -1723,102 +1689,6 @@ rb_playlist_manager_export_playlist (RBPlaylistManager *mgr,
 }
 
 static void
-playlist_manager_method_call (GDBusConnection *connection,
-			      const char *sender,
-			      const char *object_path,
-			      const char *interface_name,
-			      const char *method_name,
-			      GVariant *parameters,
-			      GDBusMethodInvocation *invocation,
-			      RBPlaylistManager *mgr)
-{
-	GError *error = NULL;
-	const char *name;
-	const char *uri;
-
-	if (g_strcmp0 (interface_name, RB_PLAYLIST_MANAGER_IFACE_NAME) != 0) {
-		rb_debug ("method call on unexpected interface %s", interface_name);
-		g_dbus_method_invocation_return_error (invocation,
-						       G_DBUS_ERROR,
-						       G_DBUS_ERROR_NOT_SUPPORTED,
-						       "Method %s.%s not supported",
-						       interface_name,
-						       method_name);
-		return;
-	}
-
-	if (g_strcmp0 (method_name, "GetPlaylists") == 0) {
-		char **names;
-
-		rb_playlist_manager_get_playlist_names (mgr, &names, NULL);
-		g_dbus_method_invocation_return_value (invocation, g_variant_new ("(^as)", names));
-		g_strfreev (names);
-	} else if (g_strcmp0 (method_name, "CreatePlaylist") == 0) {
-		g_variant_get (parameters, "(&s)", &name);
-		if (rb_playlist_manager_create_static_playlist (mgr, name, &error)) {
-			g_dbus_method_invocation_return_value (invocation, NULL);
-		} else {
-			g_dbus_method_invocation_return_gerror (invocation, error);
-			g_clear_error (&error);
-		}
-	} else if (g_strcmp0 (method_name, "DeletePlaylist") == 0) {
-		g_variant_get (parameters, "(&s)", &name);
-		if (rb_playlist_manager_delete_playlist (mgr, name, &error)) {
-			g_dbus_method_invocation_return_value (invocation, NULL);
-		} else {
-			g_dbus_method_invocation_return_gerror (invocation, error);
-			g_clear_error (&error);
-		}
-	} else if (g_strcmp0 (method_name, "AddToPlaylist") == 0) {
-		g_variant_get (parameters, "(ss)", &name, &uri);
-		if (rb_playlist_manager_add_to_playlist (mgr, name, uri, &error)) {
-			g_dbus_method_invocation_return_value (invocation, NULL);
-		} else {
-			g_dbus_method_invocation_return_gerror (invocation, error);
-			g_clear_error (&error);
-		}
-	} else if (g_strcmp0 (method_name, "RemoveFromPlaylist") == 0) {
-		g_variant_get (parameters, "(ss)", &name, &uri);
-		if (rb_playlist_manager_remove_from_playlist (mgr, name, uri, &error)) {
-			g_dbus_method_invocation_return_value (invocation, NULL);
-		} else {
-			g_dbus_method_invocation_return_gerror (invocation, error);
-			g_clear_error (&error);
-		}
-	} else if (g_strcmp0 (method_name, "ExportPlaylist") == 0) {
-		gboolean m3u_format;
-		g_variant_get (parameters, "(ssb)", &name, &uri, &m3u_format);
-		if (rb_playlist_manager_export_playlist (mgr, name, uri, m3u_format, &error)) {
-			g_dbus_method_invocation_return_value (invocation, NULL);
-		} else {
-			g_dbus_method_invocation_return_gerror (invocation, error);
-			g_clear_error (&error);
-		}
-	} else if (g_strcmp0 (method_name, "ImportPlaylist") == 0) {
-		g_variant_get (parameters, "(s)", &uri);
-		if (rb_playlist_manager_parse_file (mgr, uri, &error)) {
-			g_dbus_method_invocation_return_value (invocation, NULL);
-		} else {
-			g_dbus_method_invocation_return_gerror (invocation, error);
-			g_clear_error (&error);
-		}
-	} else {
-		g_dbus_method_invocation_return_error (invocation,
-						       G_DBUS_ERROR,
-						       G_DBUS_ERROR_NOT_SUPPORTED,
-						       "Method %s.%s not supported",
-						       interface_name,
-						       method_name);
-	}
-}
-
-static const GDBusInterfaceVTable playlist_manager_vtable = {
-	(GDBusInterfaceMethodCallFunc) playlist_manager_method_call,
-	NULL,
-	NULL
-};
-
-static void
 rb_playlist_manager_set_source (RBPlaylistManager *mgr,
 				RBSource *source)
 {
@@ -1930,7 +1800,6 @@ rb_playlist_manager_get_property (GObject *object,
 static void
 rb_playlist_manager_constructed (GObject *object)
 {
-	GDBusConnection *bus;
 	GApplication *app;
 	RBPlaylistManager *mgr = RB_PLAYLIST_MANAGER (object);
 	GtkBuilder *builder;
@@ -1959,31 +1828,6 @@ rb_playlist_manager_constructed (GObject *object)
 	rb_application_link_shared_menus (RB_APPLICATION (app), G_MENU (menu));
 	rb_application_add_shared_menu (RB_APPLICATION (app), "playlist-menu", menu);
 	g_object_unref (builder);
-
-	bus = g_bus_get_sync (G_BUS_TYPE_SESSION, NULL, NULL);
-	if (bus) {
-		GDBusNodeInfo *node_info;
-		GError *error = NULL;
-
-		node_info = g_dbus_node_info_new_for_xml (rb_playlist_manager_dbus_spec, &error);
-		if (error != NULL) {
-			g_warning ("Unable to parse playlist manager dbus spec: %s", error->message);
-			g_clear_error (&error);
-			return;
-		}
-
-		g_dbus_connection_register_object (bus,
-						   RB_PLAYLIST_MANAGER_DBUS_PATH,
-						   g_dbus_node_info_lookup_interface (node_info, RB_PLAYLIST_MANAGER_IFACE_NAME),
-						   &playlist_manager_vtable,
-						   g_object_ref (mgr),
-						   g_object_unref,
-						   &error);
-		if (error != NULL) {
-			g_warning ("Unable to register playlist manager dbus object: %s", error->message);
-			g_clear_error (&error);
-		}
-	}
 }
 
 static void

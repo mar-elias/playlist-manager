@@ -33,7 +33,6 @@
 G_BEGIN_DECLS
 
 GtkBuilder *rb_builder_load (const char *file, gpointer user_data);
-GtkBuilder *rb_builder_load_plugin_file (GObject *plugin, const char *file, gpointer user_data);
 
 void rb_builder_boldify_label (GtkBuilder *builder, const char *name);
 
