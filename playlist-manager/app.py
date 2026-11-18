@@ -505,6 +505,8 @@ class PlaylistWindow(QMainWindow):
         self.playlist_list = PlaylistList()
         self.playlist_list.itemSelectionChanged.connect(self.on_playlist_selected)
         self.playlist_list.files_dropped.connect(self.on_playlist_files)
+        self.playlist_list.setMaximumWidth(800)
+        self.playlist_list.setMinimumWidth(100)
 
         self.track_view = TrackView()
         self.track_view.itemDoubleClicked.connect(self.on_track_activated)
@@ -537,6 +539,8 @@ class PlaylistWindow(QMainWindow):
         track_bar.addWidget(self._tool_button(self.move_down_action))
         track_bar.addWidget(self._tool_button(self.remove_action))
         track_pane = QWidget()
+        track_pane.setMinimumWidth(500)
+        track_pane.setMinimumHeight(300)
         track_layout = QVBoxLayout(track_pane)
         track_layout.setContentsMargins(0, 0, 0, 0)
         track_layout.addLayout(track_bar)
@@ -545,7 +549,7 @@ class PlaylistWindow(QMainWindow):
         self.main_pane = QSplitter()
         self.main_pane.addWidget(self.playlist_list)
         self.main_pane.addWidget(track_pane)
-        self.main_pane.setCollapsible(0, False)
+        self.main_pane.setChildrenCollapsible(False)
         self.main_pane.setStretchFactor(1, 1)
         self.main_pane.setSizes([280, 900])
 
