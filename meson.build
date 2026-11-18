@@ -120,8 +120,6 @@ configure_file(input : 'config.h.meson',
 configuration : cdata)
 
 summary({'Tests': check.found(),
-         'Help': get_option('help'),
-         'API documentation': get_option('apidoc'),
         },
         section: 'General',
         bool_yn: true)

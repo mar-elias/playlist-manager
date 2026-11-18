@@ -148,26 +148,6 @@ rb_shell_preferences_class_init (RBShellPreferencesClass *klass)
 }
 
 static void
-help_cb (GtkWidget *widget,
-	 RBShellPreferences *shell_preferences)
-{
-	GError *error = NULL;
-
-	gtk_show_uri (gtk_widget_get_screen (widget),
-		      "help:rhythmbox/prefs",
-		      gtk_get_current_event_time (),
-		      &error);
-
-	if (error != NULL) {
-		rb_error_dialog (NULL,
-				 _("Couldn't display help"),
-				 "%s", error->message);
-
-		g_error_free (error);
-	}
-}
-
-static void
 rb_shell_preferences_init (RBShellPreferences *shell_preferences)
 {
 	GtkWidget *tmp;
@@ -191,11 +171,6 @@ rb_shell_preferences_init (RBShellPreferences *shell_preferences)
 	gtk_dialog_add_button (GTK_DIALOG (shell_preferences),
 			       _("_Close"),
 			       GTK_RESPONSE_CLOSE);
-	tmp = gtk_dialog_add_button (GTK_DIALOG (shell_preferences),
-			              _("_Help"),
-			              GTK_RESPONSE_HELP);
-	g_signal_connect_object (tmp, "clicked",
-				 G_CALLBACK (help_cb), shell_preferences, 0);
 	gtk_dialog_set_default_response (GTK_DIALOG (shell_preferences),
 					 GTK_RESPONSE_CLOSE);
 

@@ -180,29 +180,6 @@ about_action_cb (GSimpleAction *action, GVariant *parameters, gpointer user_data
 }
 
 static void
-help_action_cb (GSimpleAction *action, GVariant *parameters, gpointer user_data)
-{
-	RBApplication *app = RB_APPLICATION (user_data);
-	GError *error = NULL;
-	GtkWindow *window;
-
-	g_object_get (app->priv->shell, "window", &window, NULL);
-
-	gtk_show_uri (gtk_widget_get_screen (GTK_WIDGET (window)),
-		      "help:rhythmbox",
-		      gtk_get_current_event_time (),
-		      &error);
-
-	if (error != NULL) {
-		rb_error_dialog (NULL, _("Couldn't display help"),
-				 "%s", error->message);
-		g_error_free (error);
-	}
-
-	g_object_unref (window);
-}
-
-static void
 impl_activate (GApplication *app)
 {
 	RBApplication *rb = RB_APPLICATION (app);
@@ -268,7 +245,6 @@ impl_startup (GApplication *app)
 
 		/* app menu actions */
 		{ "preferences", preferences_action_cb },
-		{ "help", help_action_cb },
 		{ "about", about_action_cb },
 		{ "quit", quit_action_cb },
 	};

@@ -28,13 +28,6 @@ playlists_xml = configure_file(
 install_data('rhythmbox.gep',
   install_dir: datadir / 'rhythmbox')
 
-
-mans = [
-  'rhythmbox.1',
-]
-
-install_man(mans)
-
 metainfo = 'org.gnome.Rhythmbox3.metainfo.xml'
 metainfo_file = configure_file(
   input: metainfo + '.in',
