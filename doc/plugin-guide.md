@@ -383,7 +383,7 @@ In either case, what you need to do is create a GStreamer element, and then ask 
 
 You should check that the playback backend implements the functionality before trying to use it, since not all backends may implement all the different types of elements. In C, you should check the object implements the appropriate GObject interface, an in Python you should check the methods exist.
 
-As an example, here is how you add a "poor mans's visualisation" using Python (it can be run in the python console).
+As an example, here is how you add a "poor mans's visualisation" using Python.
 
 ```
 from gi.repository import Gst
