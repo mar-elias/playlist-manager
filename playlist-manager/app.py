@@ -198,7 +198,7 @@ class PlaylistList(QListWidget):
         self.setDragDropMode(QAbstractItemView.DragDropMode.DropOnly)
         self.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.setMinimumWidth(260)
-        self.setStyleSheet("QListWidget { font-size: 14pt; } QListWidget::item { padding: 8px 6px; }")
+        self.setStyleSheet("QListWidget { font-size: 12pt; } QListWidget::item { padding: 5px 6px; }")
 
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls():
@@ -353,12 +353,12 @@ class SettingsDialog(QDialog):
         self.setWindowTitle("Settings")
         self.setMinimumWidth(480)
         layout = QFormLayout(self)
-        self.folder_label = QLabel()
-        self.folder_label.setWordWrap(True)
+        self.folder = QLineEdit()
+        self.folder.setPlaceholderText("Paste a folder path")
         choose = QPushButton("Choose")
         choose.clicked.connect(self.choose_folder)
         folder_row = QHBoxLayout()
-        folder_row.addWidget(self.folder_label, 1)
+        folder_row.addWidget(self.folder, 1)
         folder_row.addWidget(choose)
         layout.addRow("Playlist folder", folder_row)
         self.vlc = QLineEdit()
@@ -366,37 +366,44 @@ class SettingsDialog(QDialog):
         hint = QLabel("Selected tracks open with this command. Example: vlc")
         hint.setWordWrap(True)
         layout.addRow(hint)
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
-        buttons.rejected.connect(self.close)
-        buttons.accepted.connect(self.close)
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
         layout.addRow(buttons)
-        self.finished.connect(lambda _code: self._save_vlc())
         self.refresh()
 
     def refresh(self) -> None:
-        self.folder_label.setText(self.window.settings.playlist_dir.strip() or "Not set")
+        self.folder.setText(self.window.settings.playlist_dir.strip())
         self.vlc.setText(self.window.settings.vlc_command)
 
     def choose_folder(self) -> None:
-        current = self.window.settings.playlist_dir.strip()
+        current = self.folder.text().strip()
+        if not current or not Path(current).is_dir():
+            current = self.window.settings.playlist_dir.strip()
         path = QFileDialog.getExistingDirectory(self, "Playlist folder", current)
-        if not path:
-            return
-        self.window.settings.playlist_dir = path
-        try:
-            save_settings(self.window.settings)
-        except OSError as exc:
-            self.window.show_error(f"Could not save settings.\n{exc}")
-            return
-        self.folder_label.setText(path)
-        self.window.reload_playlists()
+        if path:
+            self.folder.setText(path)
 
-    def _save_vlc(self) -> None:
+    def accept(self) -> None:
+        folder = self.folder.text().strip()
+        if folder and not Path(folder).is_dir():
+            QMessageBox.critical(
+                self,
+                "Settings",
+                f"That playlist folder is not available:\n{folder}",
+            )
+            return
+        self.window.settings.playlist_dir = folder
         self.window.settings.vlc_command = self.vlc.text().strip() or "vlc"
         try:
             save_settings(self.window.settings)
         except OSError as exc:
             self.window.show_error(f"Could not save settings.\n{exc}")
+            return
+        self.window.reload_playlists()
+        super().accept()
 
 
 class PlaylistWindow(QMainWindow):
@@ -603,7 +610,7 @@ class PlaylistWindow(QMainWindow):
 
         chosen = -1
         for path in playlists:
-            item = QListWidgetItem(path.stem)
+            item = QListWidgetItem(path.name)
             item.setData(Qt.ItemDataRole.UserRole, str(path))
             self.playlist_list.addItem(item)
             if select is not None and path == select:
