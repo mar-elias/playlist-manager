@@ -1,21 +1,14 @@
 # Playlist Manager
+A minimal local playlist manager which uses VLC.
 
-A local playlist manager. It does not play media and it does not import a music library. Tracks open in VLC.
-
-Playlists are M3U8 files in a folder chosen in Settings.
+Playlists are M3U8 files saved in a folder chosen in Settings.
 
 ## Run
-
-PyQt6 comes from the system Python, not from a conda environment:
-
-```sh
-/usr/bin/python3 playlist-manager/app.py
+```
+/usr/bin/python3 app.py
 ```
 
-Package: `python3-pyqt6`. VLC should be on `PATH`, or set another command in Settings.
-
-## Use
-
+## Information:
 - Create, rename, and delete playlists. The sidebar lists every `.m3u8` file in the playlist folder.
 - Drag audio and video files from Dolphin onto a playlist or into the track list. New files are added at the end. Move tracks up or down with the buttons to change their order.
 - Import M3U, M3U8, PLS, and XSPF. Export writes an M3U8 file.
