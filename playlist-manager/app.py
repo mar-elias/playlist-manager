@@ -65,7 +65,7 @@ from playlists import (
     rename_playlist,
     save_tracks,
 )
-from settings import Settings, load_settings, save_settings
+from settings import Settings, config_file, load_settings, save_settings
 
 _MIME_DB = QMimeDatabase()
 ROLE_INDEX = Qt.ItemDataRole.UserRole
@@ -242,6 +242,8 @@ class TrackView(QTreeWidget):
         self.setDefaultDropAction(Qt.DropAction.MoveAction)
         self.setAcceptDrops(True)
         self.setDragEnabled(True)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.setHorizontalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
         # Size of playlist items:
         self.setStyleSheet(
             "QTreeWidget { font-size: 12pt; } "
@@ -252,12 +254,9 @@ class TrackView(QTreeWidget):
         header.setStretchLastSection(False)
         header.setSectionsClickable(True)
         header.setSortIndicatorShown(True)
-        for column in (0, 4, 6):
-            header.setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        for column, width in ((2, 150), (3, 150), (5, 120), (7, 180), (8, 260)):
+        header.setMinimumSectionSize(24)
+        for column in range(self.columnCount()):
             header.setSectionResizeMode(column, QHeaderView.ResizeMode.Interactive)
-            self.setColumnWidth(column, width)
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key.Key_Delete and event.modifiers() == Qt.KeyboardModifier.NoModifier:
@@ -372,6 +371,9 @@ class SettingsDialog(QDialog):
         hint = QLabel("Selected tracks open with this command. Example: vlc")
         hint.setWordWrap(True)
         layout.addRow(hint)
+        self.settings_path = QLineEdit(str(config_file()))
+        self.settings_path.setReadOnly(True)
+        layout.addRow("Settings file", self.settings_path)
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
@@ -442,6 +444,13 @@ class PlaylistWindow(QMainWindow):
         self.track_view.remove_requested.connect(self.remove_selected_tracks)
         self.track_view.move_requested.connect(self.move_selected)
         self.track_view.header().sectionClicked.connect(self.on_column_sorted)
+        self._applying_columns = False
+        self._apply_column_widths()
+        self.track_view.header().sectionResized.connect(self._on_column_resized)
+        self._column_save = QTimer(self)
+        self._column_save.setSingleShot(True)
+        self._column_save.setInterval(400)
+        self._column_save.timeout.connect(self._write_column_widths)
 
         self.empty_page = FileDropPage("Drag audio and video files from Dolphin into this playlist.")
         self.none_page = FileDropPage("Select a playlist, or create a new one.")
@@ -642,6 +651,32 @@ class PlaylistWindow(QMainWindow):
 
     def refresh(self) -> None:
         self.reload_playlists(select=self.current_playlist)
+
+    def _apply_column_widths(self) -> None:
+        widths = self.settings.column_widths
+        header = self.track_view.header()
+        self._applying_columns = True
+        try:
+            for index in range(self.track_view.columnCount()):
+                header.setSectionResizeMode(index, QHeaderView.ResizeMode.Interactive)
+                if index < len(widths):
+                    self.track_view.setColumnWidth(index, widths[index])
+        finally:
+            self._applying_columns = False
+
+    def _on_column_resized(self, _index: int, _old: int, _new: int) -> None:
+        if self._applying_columns:
+            return
+        self.settings.column_widths = [
+            self.track_view.columnWidth(index) for index in range(self.track_view.columnCount())
+        ]
+        self._column_save.start()
+
+    def _write_column_widths(self) -> None:
+        try:
+            save_settings(self.settings)
+        except OSError as exc:
+            self.toast(f"Could not save column widths. {exc}")
 
     def _track_info(self, path: str) -> TrackInfo:
         file = Path(path)
