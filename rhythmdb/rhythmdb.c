@@ -2665,6 +2665,38 @@ rhythmdb_process_queued_entry_set_event (RhythmDB *db,
 }
 
 static void
+rhythmdb_reimport_skipped_mp4 (RhythmDBEntry *entry, gpointer data)
+{
+	RhythmDB *db = data;
+	const char *uri;
+
+	uri = rhythmdb_entry_get_string (entry, RHYTHMDB_PROP_LOCATION);
+	if (rhythmdb_uri_is_mp4 (uri) == FALSE)
+		return;
+
+	rb_debug ("re-reading previously skipped mp4: %s", uri);
+	rhythmdb_add_uri_with_types (db,
+				     uri,
+				     RHYTHMDB_ENTRY_TYPE_SONG,
+				     RHYTHMDB_ENTRY_TYPE_IGNORE,
+				     RHYTHMDB_ENTRY_TYPE_IMPORT_ERROR);
+}
+
+/* Files that were ignored before MP4 import was allowed stay hidden. */
+static void
+rhythmdb_reimport_skipped_mp4s (RhythmDB *db)
+{
+	rhythmdb_entry_foreach_by_type (db,
+					RHYTHMDB_ENTRY_TYPE_IGNORE,
+					rhythmdb_reimport_skipped_mp4,
+					db);
+	rhythmdb_entry_foreach_by_type (db,
+					RHYTHMDB_ENTRY_TYPE_IMPORT_ERROR,
+					rhythmdb_reimport_skipped_mp4,
+					db);
+}
+
+static void
 rhythmdb_process_one_event (RhythmDBEvent *event, RhythmDB *db)
 {
 	gboolean free = TRUE;
@@ -2705,6 +2737,7 @@ rhythmdb_process_one_event (RhythmDBEvent *event, RhythmDB *db)
 		break;
 	case RHYTHMDB_EVENT_DB_LOAD:
 		rb_debug ("processing RHYTHMDB_EVENT_DB_LOAD");
+		rhythmdb_reimport_skipped_mp4s (db);
 		g_signal_emit (G_OBJECT (db), rhythmdb_signals[LOAD_COMPLETE], 0);
 
 		/* save the db every five minutes */

@@ -303,8 +303,23 @@ rb_metadata_load (RBMetaData *md, const char *uri, GError **error)
 	 * video decoder is missing.  Playback uses the audio track.
 	 */
 	if (mp4) {
+		gboolean video_only = (md->priv->has_audio == FALSE);
+
 		md->priv->has_video = FALSE;
 		g_clear_error (&gsterror);
+		/*
+		 * video/mp4 marks a video-only file.  An MP4 that has audio
+		 * keeps an audio/ type so the track list can show a
+		 * different icon.
+		 */
+		if (video_only) {
+			g_free (md->priv->mediatype);
+			md->priv->mediatype = g_strdup ("video/mp4");
+		} else if (md->priv->mediatype == NULL ||
+			   g_str_has_prefix (md->priv->mediatype, "audio/") == FALSE) {
+			g_free (md->priv->mediatype);
+			md->priv->mediatype = g_strdup ("audio/mp4");
+		}
 	}
 
 done:

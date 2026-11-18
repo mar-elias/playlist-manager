@@ -842,6 +842,140 @@ struct RBEntryViewCellDataFuncData {
 	RhythmDBPropType propid;
 };
 
+typedef enum {
+	RB_MP4_MARK_NONE = 0,
+	RB_MP4_MARK_VIDEO,
+	RB_MP4_MARK_VIDEO_ONLY
+} RbMp4Mark;
+
+static RbMp4Mark
+rb_entry_mp4_mark (RhythmDBEntry *entry)
+{
+	const char *uri;
+	const char *media_type;
+	gsize len;
+	gboolean mp4;
+
+	uri = rhythmdb_entry_get_string (entry, RHYTHMDB_PROP_LOCATION);
+	media_type = rhythmdb_entry_get_string (entry, RHYTHMDB_PROP_MEDIA_TYPE);
+
+	mp4 = FALSE;
+	if (uri != NULL) {
+		len = strlen (uri);
+		if (len >= 4 && g_ascii_strcasecmp (uri + len - 4, ".mp4") == 0)
+			mp4 = TRUE;
+	}
+	if (g_strcmp0 (media_type, "audio/mp4") == 0 ||
+	    g_strcmp0 (media_type, "audio/x-m4a") == 0 ||
+	    g_strcmp0 (media_type, "audio/m4a") == 0 ||
+	    g_strcmp0 (media_type, "video/mp4") == 0 ||
+	    g_strcmp0 (media_type, "video/quicktime") == 0)
+		mp4 = TRUE;
+
+	if (mp4 == FALSE)
+		return RB_MP4_MARK_NONE;
+
+	/* A video/ type means the file has no audio stream. */
+	if (media_type != NULL && g_str_has_prefix (media_type, "video/"))
+		return RB_MP4_MARK_VIDEO_ONLY;
+
+	return RB_MP4_MARK_VIDEO;
+}
+
+static void
+rb_entry_view_video_icon_cell_data_func (GtkTreeViewColumn *column,
+					 GtkCellRenderer *renderer,
+					 GtkTreeModel *tree_model,
+					 GtkTreeIter *iter,
+					 struct RBEntryViewCellDataFuncData *data)
+{
+	RhythmDBEntry *entry;
+	const char *icon;
+
+	entry = rhythmdb_query_model_iter_to_entry (data->view->priv->model, iter);
+	if (entry == NULL) {
+		g_object_set (renderer, "icon-name", NULL, "visible", FALSE, NULL);
+		return;
+	}
+
+	switch (rb_entry_mp4_mark (entry)) {
+	case RB_MP4_MARK_VIDEO_ONLY:
+		icon = "camera-video-symbolic";
+		break;
+	case RB_MP4_MARK_VIDEO:
+		icon = "video-display-symbolic";
+		break;
+	default:
+		icon = NULL;
+		break;
+	}
+
+	g_object_set (renderer,
+		      "icon-name", icon,
+		      "visible", icon != NULL,
+		      NULL);
+	rhythmdb_entry_unref (entry);
+}
+
+static gboolean
+rb_entry_view_query_tooltip_cb (GtkWidget *widget,
+				gint x,
+				gint y,
+				gboolean keyboard_mode,
+				GtkTooltip *tooltip,
+				RBEntryView *view)
+{
+	GtkTreePath *path = NULL;
+	GtkTreeViewColumn *column = NULL;
+	GtkTreeViewColumn *title_column;
+	GtkTreeIter iter;
+	RhythmDBEntry *entry;
+	const char *text;
+	gint bx, by;
+
+	if (keyboard_mode || view->priv->model == NULL)
+		return FALSE;
+
+	title_column = g_hash_table_lookup (view->priv->propid_column_map,
+					    GINT_TO_POINTER (RHYTHMDB_PROP_TITLE));
+	if (title_column == NULL)
+		return FALSE;
+
+	gtk_tree_view_convert_widget_to_bin_window_coords (GTK_TREE_VIEW (widget), x, y, &bx, &by);
+	if (gtk_tree_view_get_path_at_pos (GTK_TREE_VIEW (widget), bx, by, &path, &column, NULL, NULL) == FALSE)
+		return FALSE;
+
+	if (column != title_column ||
+	    gtk_tree_model_get_iter (GTK_TREE_MODEL (view->priv->model), &iter, path) == FALSE) {
+		gtk_tree_path_free (path);
+		return FALSE;
+	}
+	gtk_tree_path_free (path);
+
+	entry = rhythmdb_query_model_iter_to_entry (view->priv->model, &iter);
+	if (entry == NULL)
+		return FALSE;
+
+	switch (rb_entry_mp4_mark (entry)) {
+	case RB_MP4_MARK_VIDEO_ONLY:
+		text = _("Video only");
+		break;
+	case RB_MP4_MARK_VIDEO:
+		text = _("Video");
+		break;
+	default:
+		text = NULL;
+		break;
+	}
+	rhythmdb_entry_unref (entry);
+
+	if (text == NULL)
+		return FALSE;
+
+	gtk_tooltip_set_text (tooltip, text);
+	return TRUE;
+}
+
 static void
 rb_entry_view_playing_cell_data_func (GtkTreeViewColumn *column,
 				      GtkCellRenderer *renderer,
@@ -1675,6 +1809,21 @@ rb_entry_view_append_column (RBEntryView *view,
 	if (sort_propid == RHYTHMDB_NUM_PROPERTIES)
 		sort_propid = propid;
 
+	if (coltype == RB_ENTRY_VIEW_COL_TITLE) {
+		GtkCellRenderer *icon;
+
+		icon = gtk_cell_renderer_pixbuf_new ();
+		g_object_set (icon,
+			      "stock-size", GTK_ICON_SIZE_MENU,
+			      "xpad", 4,
+			      NULL);
+		gtk_tree_view_column_pack_start (column, icon, FALSE);
+		gtk_tree_view_column_set_cell_data_func (column, icon,
+							 (GtkTreeCellDataFunc) rb_entry_view_video_icon_cell_data_func,
+							 cell_data,
+							 NULL);
+	}
+
 	if (renderer == NULL) {
 		renderer = gtk_cell_renderer_text_new ();
 		gtk_tree_view_column_pack_start (column, renderer, TRUE);
@@ -1890,6 +2039,9 @@ rb_entry_view_constructed (GObject *object)
 
 	gtk_tree_view_set_headers_visible (GTK_TREE_VIEW (view->priv->treeview), TRUE);
 	gtk_tree_selection_set_mode (view->priv->selection, GTK_SELECTION_MULTIPLE);
+	gtk_widget_set_has_tooltip (view->priv->treeview, TRUE);
+	g_signal_connect (view->priv->treeview, "query-tooltip",
+			  G_CALLBACK (rb_entry_view_query_tooltip_cb), view);
 
 	if (view->priv->is_drag_source) {
 		rb_tree_dnd_add_drag_source_support (GTK_TREE_VIEW (view->priv->treeview),

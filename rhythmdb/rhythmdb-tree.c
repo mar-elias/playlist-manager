@@ -2657,6 +2657,7 @@ rhythmdb_hash_tree_foreach (RhythmDB *adb,
 	g_mutex_lock (&ctxt.db->priv->genres_lock);
 	table = get_genres_hash_for_type (RHYTHMDB_TREE (adb), type);
 	if (table == NULL) {
+		g_mutex_unlock (&ctxt.db->priv->genres_lock);
 		return;
 	}
 	if ((ctxt.album_func != NULL)
