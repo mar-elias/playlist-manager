@@ -76,6 +76,10 @@ ROLE_INDEX = Qt.ItemDataRole.UserRole
 ROLE_PATH = Qt.ItemDataRole.UserRole + 1
 ROLE_VIDEO = Qt.ItemDataRole.UserRole + 2
 
+APP_NAME = "Mar-Elias Playlist Manager"
+APP_VERSION = "0.1.0"
+APP_URL = "https://github.com/mar-elias/playlist-manager"
+
 
 @dataclass(frozen=True)
 class TrackInfo:
@@ -484,6 +488,32 @@ class SettingsDialog(QDialog):
         super().accept()
 
 
+class AboutDialog(QDialog):
+    def __init__(self, parent: QWidget | None = None):
+        super().__init__(parent)
+        self.setWindowTitle("About")
+        self.setMinimumWidth(460)
+        layout = QVBoxLayout(self)
+        name = QLabel(APP_NAME)
+        name.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        font = name.font()
+        font.setBold(True)
+        font.setPointSize(font.pointSize() + 2)
+        name.setFont(font)
+        version = QLabel(f"Version {APP_VERSION}")
+        version.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        link = QLabel(f'<a href="{APP_URL}">{APP_URL}</a>')
+        link.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        link.setOpenExternalLinks(True)
+        link.setTextInteractionFlags(Qt.TextInteractionFlag.TextBrowserInteraction)
+        layout.addWidget(name)
+        layout.addWidget(version)
+        layout.addWidget(link)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+
 class PlaylistWindow(QMainWindow):
     def __init__(self, settings: Settings):
         super().__init__()
@@ -640,6 +670,8 @@ class PlaylistWindow(QMainWindow):
         playlist_menu.addAction(self.refresh_action)
         settings_menu = menu.addMenu("Settings")
         settings_menu.addAction(self.settings_action)
+        help_menu = menu.addMenu("Help")
+        help_menu.addAction("About", self.open_about)
 
     def _action(self, text, icon, shortcut, slot):
         action = self.addAction(text)
@@ -1126,6 +1158,9 @@ class PlaylistWindow(QMainWindow):
         except OSError as exc:
             self.show_error(f"Could not start VLC.\n{exc}")
 
+    def open_about(self) -> None:
+        AboutDialog(self).exec()
+
     def open_settings(self) -> None:
         if self._settings_dialog is None:
             self._settings_dialog = SettingsDialog(self)
@@ -1159,7 +1194,8 @@ class PlaylistWindow(QMainWindow):
 
 def main() -> int:
     app = QApplication(sys.argv)
-    app.setApplicationName("Playlist Manager")
+    app.setApplicationName(APP_NAME)
+    app.setApplicationVersion(APP_VERSION)
     window = PlaylistWindow(load_settings())
     window.show()
     return app.exec()
