@@ -3,6 +3,7 @@
 #include "error.hpp"
 #include "playlists.hpp"
 #include "shlex.hpp"
+#include "svgicon.hpp"
 
 #include <QApplication>
 #include <QColor>
@@ -12,10 +13,8 @@
 #include <QFileInfo>
 #include <QFormLayout>
 #include <QHBoxLayout>
-#include <QHash>
 #include <QHeaderView>
 #include <QIcon>
-#include <QImage>
 #include <QInputDialog>
 #include <QKeySequence>
 #include <QLabel>
@@ -26,7 +25,6 @@
 #include <QMimeData>
 #include <QPainter>
 #include <QPalette>
-#include <QPixmap>
 #include <QProcess>
 #include <QPushButton>
 #include <QSet>
@@ -42,85 +40,11 @@
 
 #include <sys/stat.h>
 
-#include <functional>
-
 namespace {
 
 constexpr char kAppName[] = "Mar-Elias Playlist Manager";
 constexpr char kAppVersion[] = "0.1.0";
 constexpr char kAppUrl[] = "https://github.com/mar-elias/playlist-manager";
-
-QIcon videoIcon(const QColor& color) {
-    static QHash<QRgb, QIcon> cache;
-    const auto found = cache.constFind(color.rgba());
-    if (found != cache.constEnd())
-        return found.value();
-
-    QIcon icon;
-    const auto tint = [&icon, &color](const QString& resource) {
-        QImage image(resource);
-        if (image.isNull())
-            return;
-        image = image.convertToFormat(QImage::Format_ARGB32);
-        for (int y = 0; y < image.height(); ++y) {
-            auto* line = reinterpret_cast<QRgb*>(image.scanLine(y));
-            for (int x = 0; x < image.width(); ++x) {
-                const int alpha = qAlpha(line[x]);
-                line[x] = qRgba(color.red(), color.green(), color.blue(), alpha);
-            }
-        }
-        icon.addPixmap(QPixmap::fromImage(image));
-    };
-    tint(QStringLiteral(":/icons/video-16.png"));
-    tint(QStringLiteral(":/icons/video-32.png"));
-    if (icon.isNull())
-        icon = QIcon::fromTheme(QStringLiteral("video-display-symbolic"));
-    cache.insert(color.rgba(), icon);
-    return icon;
-}
-
-QIcon paintIcon(const std::function<void(QPainter&, qreal)>& draw) {
-    QIcon icon;
-    for (const int size : {16, 24, 32}) {
-        QPixmap pixmap(size, size);
-        pixmap.fill(Qt::transparent);
-        QPainter painter(&pixmap);
-        painter.setRenderHint(QPainter::Antialiasing);
-        draw(painter, size);
-        painter.end();
-        icon.addPixmap(pixmap);
-    }
-    return icon;
-}
-
-QIcon copyIcon(const QColor& color, const QColor& fill) {
-    return paintIcon([color, fill](QPainter& painter, qreal size) {
-        QPen pen(color);
-        pen.setWidthF(std::max(1.0, size / 16.0));
-        painter.setPen(pen);
-        painter.setBrush(Qt::NoBrush);
-        const qreal margin = size * 0.12;
-        const qreal offset = size * 0.22;
-        const QRectF back(margin, margin, size - margin * 2 - offset, size - margin * 2 - offset);
-        const QRectF front(margin + offset, margin + offset, back.width(), back.height());
-        painter.drawRoundedRect(back, size * 0.08, size * 0.08);
-        painter.setBrush(fill);
-        painter.drawRoundedRect(front, size * 0.08, size * 0.08);
-    });
-}
-
-QIcon pasteIcon(const QColor& color) {
-    return paintIcon([color](QPainter& painter, qreal size) {
-        QPen pen(color);
-        pen.setWidthF(std::max(1.0, size / 16.0));
-        painter.setPen(pen);
-        painter.setBrush(Qt::NoBrush);
-        const QRectF body(size * 0.18, size * 0.22, size * 0.64, size * 0.66);
-        painter.drawRoundedRect(body, size * 0.08, size * 0.08);
-        const QRectF clip(size * 0.36, size * 0.08, size * 0.28, size * 0.22);
-        painter.drawRoundedRect(clip, size * 0.06, size * 0.06);
-    });
-}
 
 QColor errorColor(const QWidget* widget) {
     const QColor text = widget->palette().color(widget->foregroundRole());
@@ -236,9 +160,8 @@ void TitleDelegate::paint(QPainter* painter, const QStyleOptionViewItem& option,
     text.rect = QRect(full.x(), full.y(), std::max(0, full.width() - kIcon - kGap), full.height());
     style->drawControl(QStyle::CE_ItemViewItem, &text, painter, widget);
 
-    const QColor color = background.palette.color(QPalette::Text);
     const QRect iconRect(full.right() - kIcon + 1, full.top(), kIcon, full.height());
-    videoIcon(color).paint(painter, iconRect, Qt::AlignCenter);
+    svgIcon(QStringLiteral("video-display")).paint(painter, iconRect, Qt::AlignCenter);
 }
 
 TrackView::TrackView(QWidget* parent) : QTreeWidget(parent) {
@@ -503,37 +426,35 @@ PlaylistWindow::PlaylistWindow(Settings settings, QWidget* parent)
 }
 
 void PlaylistWindow::buildActions() {
-    QStyle* style = this->style();
-    newAction_ = makeAction(QStringLiteral("New"), style->standardIcon(QStyle::SP_FileDialogNewFolder),
-                            QKeySequence::New);
+    const auto icon = [](const char* name) {
+        return svgIcon(QString::fromLatin1(name));
+    };
+    newAction_ = makeAction(QStringLiteral("New"), icon("folder-new"), QKeySequence::New);
     connect(newAction_, &QAction::triggered, this, &PlaylistWindow::onNewPlaylist);
-    importAction_ = makeAction(QStringLiteral("Import"), style->standardIcon(QStyle::SP_DialogOpenButton),
+    importAction_ = makeAction(QStringLiteral("Import"), icon("document-import"),
                                QKeySequence(QStringLiteral("Ctrl+I")));
     connect(importAction_, &QAction::triggered, this, &PlaylistWindow::onImportPlaylist);
-    exportAction_ = makeAction(QStringLiteral("Export"), style->standardIcon(QStyle::SP_DialogSaveButton),
+    exportAction_ = makeAction(QStringLiteral("Export"), icon("document-export"),
                                QKeySequence(QStringLiteral("Ctrl+E")));
     connect(exportAction_, &QAction::triggered, this, &PlaylistWindow::onExportPlaylist);
-    playAction_ = makeAction(QStringLiteral("Play"), style->standardIcon(QStyle::SP_MediaPlay),
+    playAction_ = makeAction(QStringLiteral("Play"), icon("media-playback-start"),
                              QKeySequence(QStringLiteral("Ctrl+Return")));
     connect(playAction_, &QAction::triggered, this, &PlaylistWindow::play);
     renameAction_ = makeAction(QStringLiteral("Rename"), QIcon(), QKeySequence(QStringLiteral("F2")));
     connect(renameAction_, &QAction::triggered, this, &PlaylistWindow::onRenamePlaylist);
     deleteAction_ = makeAction(QStringLiteral("Delete playlist"), QIcon(), QKeySequence());
     connect(deleteAction_, &QAction::triggered, this, &PlaylistWindow::onDeletePlaylist);
-    removeAction_ = makeAction(QStringLiteral("Remove"), style->standardIcon(QStyle::SP_TrashIcon), QKeySequence());
+    removeAction_ = makeAction(QStringLiteral("Remove"), icon("edit-delete"), QKeySequence());
     connect(removeAction_, &QAction::triggered, this, &PlaylistWindow::removeSelectedTracks);
-    moveUpAction_ = makeAction(QStringLiteral("Move up"), style->standardIcon(QStyle::SP_ArrowUp), QKeySequence());
+    moveUpAction_ = makeAction(QStringLiteral("Move up"), icon("go-up"), QKeySequence());
     connect(moveUpAction_, &QAction::triggered, this, [this] { moveSelected(-1); });
-    moveDownAction_ = makeAction(QStringLiteral("Move down"), style->standardIcon(QStyle::SP_ArrowDown), QKeySequence());
+    moveDownAction_ = makeAction(QStringLiteral("Move down"), icon("go-down"), QKeySequence());
     connect(moveDownAction_, &QAction::triggered, this, [this] { moveSelected(1); });
-    const QColor iconColor = palette().color(QPalette::ButtonText);
-    copyAction_ = makeAction(QStringLiteral("Copy"), copyIcon(iconColor, palette().color(QPalette::Button)),
-                            QKeySequence::Copy);
+    copyAction_ = makeAction(QStringLiteral("Copy"), icon("edit-copy"), QKeySequence::Copy);
     connect(copyAction_, &QAction::triggered, this, &PlaylistWindow::copySelectedTracks);
-    pasteAction_ = makeAction(QStringLiteral("Paste"), pasteIcon(iconColor), QKeySequence::Paste);
+    pasteAction_ = makeAction(QStringLiteral("Paste"), icon("edit-paste"), QKeySequence::Paste);
     connect(pasteAction_, &QAction::triggered, this, &PlaylistWindow::pasteCopiedTracks);
-    refreshAction_ = makeAction(QStringLiteral("Refresh"), style->standardIcon(QStyle::SP_BrowserReload),
-                                QKeySequence::Refresh);
+    refreshAction_ = makeAction(QStringLiteral("Refresh"), icon("view-refresh"), QKeySequence::Refresh);
     connect(refreshAction_, &QAction::triggered, this, &PlaylistWindow::refresh);
     settingsAction_ = makeAction(QStringLiteral("Settings"), QIcon(), QKeySequence(QStringLiteral("Ctrl+,")));
     connect(settingsAction_, &QAction::triggered, this, &PlaylistWindow::openSettings);
@@ -578,6 +499,9 @@ void PlaylistWindow::buildToolbar() {
     auto* toolbar = new QToolBar(this);
     toolbar->setMovable(false);
     toolbar->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    auto* playlistLabel = new QLabel(QStringLiteral("Playlist:"), toolbar);
+    playlistLabel->setContentsMargins(8, 0, 6, 0);
+    toolbar->addWidget(playlistLabel);
     toolbar->addAction(newAction_);
     toolbar->addAction(importAction_);
     toolbar->addAction(exportAction_);
@@ -585,9 +509,9 @@ void PlaylistWindow::buildToolbar() {
     auto* spacer = new QWidget(toolbar);
     spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
     toolbar->addWidget(spacer);
-    auto* playlistLabel = new QLabel(QStringLiteral("Tracks:"), toolbar);
-    playlistLabel->setContentsMargins(8, 0, 6, 0);
-    toolbar->addWidget(playlistLabel);
+    auto* tracksLabel = new QLabel(QStringLiteral("Tracks:"), toolbar);
+    tracksLabel->setContentsMargins(8, 0, 6, 0);
+    toolbar->addWidget(tracksLabel);
     toolbar->addAction(moveUpAction_);
     toolbar->addAction(moveDownAction_);
     toolbar->addAction(copyAction_);

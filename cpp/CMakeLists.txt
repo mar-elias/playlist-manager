@@ -19,6 +19,7 @@ set(PLAYLIST_CORE_SOURCES
 add_executable(playlist-manager
     src/main.cpp
     src/mainwindow.cpp
+    src/svgicon.cpp
     resources.qrc
     ${PLAYLIST_CORE_SOURCES}
 )
