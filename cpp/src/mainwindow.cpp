@@ -20,6 +20,7 @@
 #include <QKeySequence>
 #include <QLabel>
 #include <QLineEdit>
+#include <QMenu>
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QMimeData>
@@ -36,14 +37,12 @@
 #include <QStyle>
 #include <QTimer>
 #include <QToolBar>
-#include <QToolButton>
 #include <QUrl>
 #include <QVBoxLayout>
 
 #include <sys/stat.h>
 
-#include <algorithm>
-#include <utility>
+#include <functional>
 
 namespace {
 
@@ -78,6 +77,49 @@ QIcon videoIcon(const QColor& color) {
         icon = QIcon::fromTheme(QStringLiteral("video-display-symbolic"));
     cache.insert(color.rgba(), icon);
     return icon;
+}
+
+QIcon paintIcon(const std::function<void(QPainter&, qreal)>& draw) {
+    QIcon icon;
+    for (const int size : {16, 24, 32}) {
+        QPixmap pixmap(size, size);
+        pixmap.fill(Qt::transparent);
+        QPainter painter(&pixmap);
+        painter.setRenderHint(QPainter::Antialiasing);
+        draw(painter, size);
+        painter.end();
+        icon.addPixmap(pixmap);
+    }
+    return icon;
+}
+
+QIcon copyIcon(const QColor& color, const QColor& fill) {
+    return paintIcon([color, fill](QPainter& painter, qreal size) {
+        QPen pen(color);
+        pen.setWidthF(std::max(1.0, size / 16.0));
+        painter.setPen(pen);
+        painter.setBrush(Qt::NoBrush);
+        const qreal margin = size * 0.12;
+        const qreal offset = size * 0.22;
+        const QRectF back(margin, margin, size - margin * 2 - offset, size - margin * 2 - offset);
+        const QRectF front(margin + offset, margin + offset, back.width(), back.height());
+        painter.drawRoundedRect(back, size * 0.08, size * 0.08);
+        painter.setBrush(fill);
+        painter.drawRoundedRect(front, size * 0.08, size * 0.08);
+    });
+}
+
+QIcon pasteIcon(const QColor& color) {
+    return paintIcon([color](QPainter& painter, qreal size) {
+        QPen pen(color);
+        pen.setWidthF(std::max(1.0, size / 16.0));
+        painter.setPen(pen);
+        painter.setBrush(Qt::NoBrush);
+        const QRectF body(size * 0.18, size * 0.22, size * 0.64, size * 0.66);
+        painter.drawRoundedRect(body, size * 0.08, size * 0.08);
+        const QRectF clip(size * 0.36, size * 0.08, size * 0.28, size * 0.22);
+        painter.drawRoundedRect(clip, size * 0.06, size * 0.06);
+    });
 }
 
 QColor errorColor(const QWidget* widget) {
@@ -401,6 +443,8 @@ PlaylistWindow::PlaylistWindow(Settings settings, QWidget* parent)
     playlistList_ = new PlaylistList(this);
     connect(playlistList_, &PlaylistList::filesDropped, this, &PlaylistWindow::onPlaylistFiles);
     connect(playlistList_, &QListWidget::itemSelectionChanged, this, &PlaylistWindow::onPlaylistSelected);
+    playlistList_->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(playlistList_, &QWidget::customContextMenuRequested, this, &PlaylistWindow::showPlaylistMenu);
     playlistList_->setMaximumWidth(800);
     playlistList_->setMinimumWidth(100);
 
@@ -410,6 +454,8 @@ PlaylistWindow::PlaylistWindow(Settings settings, QWidget* parent)
     connect(trackView_, &TrackView::filesDropped, this, &PlaylistWindow::onTrackFiles);
     connect(trackView_, &TrackView::removeRequested, this, &PlaylistWindow::removeSelectedTracks);
     connect(trackView_, &TrackView::moveRequested, this, &PlaylistWindow::moveSelected);
+    trackView_->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(trackView_, &QWidget::customContextMenuRequested, this, &PlaylistWindow::showTrackMenu);
     connect(trackView_->header(), &QHeaderView::sectionClicked, this, &PlaylistWindow::onColumnSorted);
     applyColumnWidths();
     connect(trackView_->header(), &QHeaderView::sectionResized, this, [this](int, int, int) { onColumnResized(); });
@@ -421,6 +467,8 @@ PlaylistWindow::PlaylistWindow(Settings settings, QWidget* parent)
     emptyPage_ = new FileDropPage(QStringLiteral("Drag audio and video files from Dolphin into this playlist."), this);
     nonePage_ = new FileDropPage(QStringLiteral("Select a playlist, or create a new one."), this);
     connect(emptyPage_, &FileDropPage::filesDropped, this, &PlaylistWindow::onTrackFiles);
+    emptyPage_->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(emptyPage_, &QWidget::customContextMenuRequested, this, &PlaylistWindow::showTrackMenu);
     connect(nonePage_, &FileDropPage::filesDropped, this, &PlaylistWindow::onTrackFiles);
 
     trackStack_ = new QStackedWidget(this);
@@ -428,17 +476,11 @@ PlaylistWindow::PlaylistWindow(Settings settings, QWidget* parent)
     trackStack_->addWidget(emptyPage_);
     trackStack_->addWidget(nonePage_);
 
-    auto* trackBar = new QHBoxLayout();
-    trackBar->addStretch(1);
-    trackBar->addWidget(toolButton(moveUpAction_));
-    trackBar->addWidget(toolButton(moveDownAction_));
-    trackBar->addWidget(toolButton(removeAction_));
     auto* trackPane = new QWidget(this);
     trackPane->setMinimumWidth(500);
     trackPane->setMinimumHeight(300);
     auto* trackLayout = new QVBoxLayout(trackPane);
     trackLayout->setContentsMargins(0, 0, 0, 0);
-    trackLayout->addLayout(trackBar);
     trackLayout->addWidget(trackStack_, 1);
 
     mainPane_ = new QSplitter(this);
@@ -484,6 +526,12 @@ void PlaylistWindow::buildActions() {
     connect(moveUpAction_, &QAction::triggered, this, [this] { moveSelected(-1); });
     moveDownAction_ = makeAction(QStringLiteral("Move down"), style->standardIcon(QStyle::SP_ArrowDown), QKeySequence());
     connect(moveDownAction_, &QAction::triggered, this, [this] { moveSelected(1); });
+    const QColor iconColor = palette().color(QPalette::ButtonText);
+    copyAction_ = makeAction(QStringLiteral("Copy"), copyIcon(iconColor, palette().color(QPalette::Button)),
+                            QKeySequence::Copy);
+    connect(copyAction_, &QAction::triggered, this, &PlaylistWindow::copySelectedTracks);
+    pasteAction_ = makeAction(QStringLiteral("Paste"), pasteIcon(iconColor), QKeySequence::Paste);
+    connect(pasteAction_, &QAction::triggered, this, &PlaylistWindow::pasteCopiedTracks);
     refreshAction_ = makeAction(QStringLiteral("Refresh"), style->standardIcon(QStyle::SP_BrowserReload),
                                 QKeySequence::Refresh);
     connect(refreshAction_, &QAction::triggered, this, &PlaylistWindow::refresh);
@@ -506,6 +554,8 @@ void PlaylistWindow::buildActions() {
     playlistMenu->addAction(removeAction_);
     playlistMenu->addAction(moveUpAction_);
     playlistMenu->addAction(moveDownAction_);
+    playlistMenu->addAction(copyAction_);
+    playlistMenu->addAction(pasteAction_);
     playlistMenu->addSeparator();
     playlistMenu->addAction(refreshAction_);
 
@@ -532,13 +582,18 @@ void PlaylistWindow::buildToolbar() {
     toolbar->addAction(importAction_);
     toolbar->addAction(exportAction_);
     toolbar->addAction(playAction_);
+    auto* spacer = new QWidget(toolbar);
+    spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+    toolbar->addWidget(spacer);
+    auto* playlistLabel = new QLabel(QStringLiteral("Tracks:"), toolbar);
+    playlistLabel->setContentsMargins(8, 0, 6, 0);
+    toolbar->addWidget(playlistLabel);
+    toolbar->addAction(moveUpAction_);
+    toolbar->addAction(moveDownAction_);
+    toolbar->addAction(copyAction_);
+    toolbar->addAction(pasteAction_);
+    toolbar->addAction(removeAction_);
     addToolBar(toolbar);
-}
-
-QWidget* PlaylistWindow::toolButton(QAction* action) {
-    auto* button = new QToolButton(this);
-    button->setDefaultAction(action);
-    return button;
 }
 
 QString PlaylistWindow::playlistDirectory() const {
@@ -795,6 +850,8 @@ void PlaylistWindow::updateActions() {
     removeAction_->setEnabled(hasTracks);
     moveUpAction_->setEnabled(hasTracks);
     moveDownAction_->setEnabled(hasTracks);
+    copyAction_->setEnabled(hasTracks);
+    pasteAction_->setEnabled(!copiedTracks_.isEmpty() && hasPlaylist);
     playAction_->setEnabled(hasPlaylist);
 }
 
@@ -1000,6 +1057,77 @@ void PlaylistWindow::removeSelectedTracks() {
     }
     tracks_ = kept;
     writeCurrent();
+}
+
+void PlaylistWindow::copySelectedTracks() {
+    const QList<int> rows = selectedRows();
+    if (rows.isEmpty())
+        return;
+    copiedTracks_.clear();
+    for (int index : rows)
+        copiedTracks_.append(tracks_.at(index));
+    updateActions();
+}
+
+void PlaylistWindow::pasteCopiedTracks() {
+    pasteInto(currentPlaylist_);
+}
+
+void PlaylistWindow::pasteInto(const QString& playlist) {
+    if (copiedTracks_.isEmpty()) {
+        toast(QStringLiteral("Copy tracks first."));
+        return;
+    }
+    if (playlist.isEmpty()) {
+        toast(QStringLiteral("Create a playlist first."));
+        return;
+    }
+    const QString playlistName = QFileInfo(playlist).completeBaseName();
+    QString question;
+    if (copiedTracks_.size() == 1) {
+        QString trackName = trackInfo(copiedTracks_.first()).title;
+        if (trackName.isEmpty())
+            trackName = QFileInfo(copiedTracks_.first()).fileName();
+        question = QStringLiteral("Paste “%1” into “%2”?").arg(trackName, playlistName);
+    } else {
+        question = QStringLiteral("Paste %1 items into “%2”?").arg(copiedTracks_.size()).arg(playlistName);
+    }
+    QMessageBox box(QMessageBox::Question, QStringLiteral("Paste into playlist?"),
+                    QStringLiteral("%1\nThey will be added at the end of the playlist.").arg(question),
+                    QMessageBox::Yes | QMessageBox::Cancel, this);
+    box.setDefaultButton(QMessageBox::Yes);
+    box.button(QMessageBox::Yes)->setText(QStringLiteral("Paste"));
+    if (box.exec() != QMessageBox::Yes)
+        return;
+    if (playlist != currentPlaylist_)
+        selectPlaylist(playlist);
+    if (currentPlaylist_ != playlist)
+        return;
+    try {
+        addPaths(playlist, copiedTracks_);
+    } catch (const AppError& exc) {
+        showError(exc.message());
+    }
+}
+
+void PlaylistWindow::showTrackMenu(const QPoint& position) {
+    QMenu menu(this);
+    menu.addAction(copyAction_);
+    menu.addAction(pasteAction_);
+    const QWidget* source = qobject_cast<QWidget*>(sender());
+    menu.exec((source == nullptr ? trackView_ : source)->mapToGlobal(position));
+}
+
+void PlaylistWindow::showPlaylistMenu(const QPoint& position) {
+    const QListWidgetItem* item = playlistList_->itemAt(position);
+    if (item == nullptr)
+        return;
+    const QString playlist = item->data(Qt::UserRole).toString();
+    QMenu menu(this);
+    QAction* paste = menu.addAction(QStringLiteral("Paste"));
+    paste->setEnabled(!copiedTracks_.isEmpty());
+    if (menu.exec(playlistList_->mapToGlobal(position)) == paste)
+        pasteInto(playlist);
 }
 
 void PlaylistWindow::moveSelected(int delta) {

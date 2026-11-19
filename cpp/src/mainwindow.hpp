@@ -136,6 +136,10 @@ private slots:
     void onTrackActivated(QTreeWidgetItem* item, int column);
     void removeSelectedTracks();
     void moveSelected(int delta);
+    void copySelectedTracks();
+    void pasteCopiedTracks();
+    void showTrackMenu(const QPoint& position);
+    void showPlaylistMenu(const QPoint& position);
     void onNewPlaylist();
     void onRenamePlaylist();
     void onDeletePlaylist();
@@ -151,7 +155,6 @@ private:
     void buildActions();
     void buildToolbar();
     QAction* makeAction(const QString& text, const QIcon& icon, const QKeySequence& shortcut);
-    QWidget* toolButton(QAction* action);
     QString playlistDirectory() const;
     void reloadPlaylists(bool useGiven, const QString& given);
     void showSetup();
@@ -170,6 +173,7 @@ private:
     void finishPlaylistDrop(const QString& playlist, const QStringList& paths);
     void finishTrackDrop(const QString& playlist, const QStringList& paths);
     void selectPlaylist(const QString& playlist);
+    void pasteInto(const QString& playlist);
     void addPaths(const QString& playlist, const QStringList& paths);
     void writeCurrent(const QList<int>& select = {});
     void playPaths(const QStringList& paths);
@@ -178,6 +182,7 @@ private:
     Settings settings_;
     QString currentPlaylist_;
     QStringList tracks_;
+    QStringList copiedTracks_;
     QHash<QString, QStringList> selectionMemory_;
     bool loading_ = false;
     bool applyingColumns_ = false;
@@ -196,6 +201,8 @@ private:
     QAction* removeAction_ = nullptr;
     QAction* moveUpAction_ = nullptr;
     QAction* moveDownAction_ = nullptr;
+    QAction* copyAction_ = nullptr;
+    QAction* pasteAction_ = nullptr;
     QAction* refreshAction_ = nullptr;
     QAction* settingsAction_ = nullptr;
 
