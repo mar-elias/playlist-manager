@@ -3,6 +3,8 @@
 *.kate-swp
 _install/
 _build/
+cpp/build/
 .directory
 
 database/
+.vscode/
