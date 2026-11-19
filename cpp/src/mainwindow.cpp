@@ -557,6 +557,7 @@ void PlaylistWindow::reloadPlaylistsSelecting(const QString& path) {
 }
 
 void PlaylistWindow::reloadPlaylists(bool useGiven, const QString& given) {
+    rememberSelection();
     const QString select = useGiven ? given : currentPlaylist_;
     const QString directory = playlistDirectory();
     loading_ = true;
@@ -731,6 +732,7 @@ void PlaylistWindow::showTracks(const QList<int>& select) {
     trackView_->clear();
     const QColor missingColor = errorColor(trackView_);
     const QSet<int> chosen(select.begin(), select.end());
+    QTreeWidgetItem* firstSelected = nullptr;
     for (int playlistIndex : displayOrder()) {
         const QString& track = tracks_.at(playlistIndex);
         const TrackInfo info = trackInfo(track);
@@ -761,9 +763,14 @@ void PlaylistWindow::showTracks(const QList<int>& select) {
                 item->setForeground(column, missingColor);
         }
         trackView_->addTopLevelItem(item);
-        if (chosen.contains(playlistIndex))
+        if (chosen.contains(playlistIndex)) {
             item->setSelected(true);
+            if (firstSelected == nullptr)
+                firstSelected = item;
+        }
     }
+    if (firstSelected != nullptr)
+        trackView_->scrollToItem(firstSelected);
     trackView_->header()->setSortIndicator(
         sortColumn_, sortDescending_ ? Qt::DescendingOrder : Qt::AscendingOrder);
     if (currentPlaylist_.isEmpty()) {
@@ -791,9 +798,36 @@ void PlaylistWindow::updateActions() {
     playAction_->setEnabled(hasPlaylist);
 }
 
+void PlaylistWindow::rememberSelection() {
+    if (currentPlaylist_.isEmpty())
+        return;
+    QStringList paths;
+    for (int index : selectedRows()) {
+        if (index >= 0 && index < tracks_.size())
+            paths.append(tracks_.at(index));
+    }
+    selectionMemory_.insert(currentPlaylist_, paths);
+}
+
+QList<int> PlaylistWindow::savedRows(const QString& playlist) const {
+    QList<int> rows;
+    QSet<int> used;
+    for (const QString& path : selectionMemory_.value(playlist)) {
+        for (int index = 0; index < tracks_.size(); ++index) {
+            if (used.contains(index) || tracks_.at(index) != path)
+                continue;
+            used.insert(index);
+            rows.append(index);
+            break;
+        }
+    }
+    return rows;
+}
+
 void PlaylistWindow::onPlaylistSelected() {
     if (loading_)
         return;
+    rememberSelection();
     const QListWidgetItem* item = playlistList_->currentItem();
     if (item == nullptr) {
         currentPlaylist_.clear();
@@ -808,7 +842,7 @@ void PlaylistWindow::onPlaylistSelected() {
         tracks_.clear();
         showError(exc.message());
     }
-    showTracks();
+    showTracks(savedRows(currentPlaylist_));
 }
 
 void PlaylistWindow::onColumnSorted(int column) {
@@ -871,7 +905,11 @@ void PlaylistWindow::renameCurrent(const QString& name) {
     if (currentPlaylist_.isEmpty())
         return;
     try {
-        currentPlaylist_ = renamePlaylist(currentPlaylist_, name);
+        const QString previous = currentPlaylist_;
+        currentPlaylist_ = renamePlaylist(previous, name);
+        if (previous != currentPlaylist_) {
+            selectionMemory_.insert(currentPlaylist_, selectionMemory_.take(previous));
+        }
         reloadPlaylistsSelecting(currentPlaylist_);
     } catch (const AppError& exc) {
         showError(exc.message());
@@ -894,6 +932,7 @@ void PlaylistWindow::onDeletePlaylist() {
         showError(QStringLiteral("Could not delete the playlist.\n%1").arg(exc.message()));
         return;
     }
+    selectionMemory_.remove(currentPlaylist_);
     currentPlaylist_.clear();
     reloadPlaylists();
 }

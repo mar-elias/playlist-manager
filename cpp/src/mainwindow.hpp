@@ -163,6 +163,8 @@ private:
     void showTracks(const QList<int>& select = {});
     void updateActions();
     QList<int> selectedRows() const;
+    void rememberSelection();
+    QList<int> savedRows(const QString& playlist) const;
     void createNamedPlaylist(const QString& name);
     void renameCurrent(const QString& name);
     void finishPlaylistDrop(const QString& playlist, const QStringList& paths);
@@ -176,6 +178,7 @@ private:
     Settings settings_;
     QString currentPlaylist_;
     QStringList tracks_;
+    QHash<QString, QStringList> selectionMemory_;
     bool loading_ = false;
     bool applyingColumns_ = false;
     int sortColumn_ = 0;
