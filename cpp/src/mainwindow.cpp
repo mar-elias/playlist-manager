@@ -108,6 +108,20 @@ bool sortLess(const SortKey& left, const SortKey& right) {
     return left.number < right.number;
 }
 
+QString scrollBarStyle() {
+    return QStringLiteral(
+        "QScrollBar:vertical { background: transparent; width: 15px; margin: 0; }"
+        "QScrollBar::handle:vertical { background: rgb(100, 100, 100); min-height: 24px; border-radius: 5px; margin: 2px; }"
+        "QScrollBar::handle:vertical:hover { background: rgb(50,50,50); }"
+        "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; background: transparent; border: none; }"
+        "QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: transparent; }"
+        "QScrollBar:horizontal { background: transparent; height: 15px; margin: 0; }"
+        "QScrollBar::handle:horizontal { background: rgb(100, 100, 100); min-width: 24px; border-radius: 5px; margin: 2px; }"
+        "QScrollBar::handle:horizontal:hover { background: rgb(50,50,50); }"
+        "QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal { width: 0; background: transparent; border: none; }"
+        "QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal { background: transparent; }");
+}
+
 }  // namespace
 
 PlaylistList::PlaylistList(QWidget* parent) : QListWidget(parent) {
@@ -116,7 +130,8 @@ PlaylistList::PlaylistList(QWidget* parent) : QListWidget(parent) {
     setSelectionMode(QAbstractItemView::SingleSelection);
     setMinimumWidth(260);
     setStyleSheet(QStringLiteral(
-        "QListWidget { font-size: 12pt; } QListWidget::item { padding: 5px 6px; }"));
+                      "QListWidget { font-size: 12pt; } QListWidget::item { padding: 5px 6px; }")
+                  + scrollBarStyle());
 }
 
 void PlaylistList::dragEnterEvent(QDragEnterEvent* event) {
@@ -180,9 +195,10 @@ TrackView::TrackView(QWidget* parent) : QTreeWidget(parent) {
     setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
     setHorizontalScrollMode(QAbstractItemView::ScrollPerPixel);
     setStyleSheet(QStringLiteral(
-        "QTreeWidget { font-size: 12pt; } "
-        "QTreeWidget::item { padding-top: 4px; padding-bottom: 4px; } "
-        "QHeaderView { font-size: 10pt; }"));
+                      "QTreeWidget { font-size: 12pt; } "
+                      "QTreeWidget::item { padding-top: 4px; padding-bottom: 4px; } "
+                      "QHeaderView { font-size: 10pt; }")
+                  + scrollBarStyle());
     QHeaderView* header = this->header();
     header->setStretchLastSection(false);
     header->setSectionsClickable(true);
