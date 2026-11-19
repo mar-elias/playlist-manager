@@ -4,8 +4,9 @@ A minimal local playlist manager which uses VLC.
 Playlists are M3U8 files saved in a folder chosen in Settings.
 
 ## Run
+# Python version (moved to c++):
 ```
-/usr/bin/python3 app.py
+        /usr/bin/python3 app.py
 ```
 
 ## Information:
