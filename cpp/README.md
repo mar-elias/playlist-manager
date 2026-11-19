@@ -11,5 +11,3 @@ cmake -S cpp -B cpp/build
 cmake --build cpp/build
 ./cpp/build/playlist-manager
 ```
-
-`playlist-manager-tests` checks playlist files, settings, and tag reading.

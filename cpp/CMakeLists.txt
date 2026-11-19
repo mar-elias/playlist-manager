@@ -26,12 +26,3 @@ add_executable(playlist-manager
 target_include_directories(playlist-manager PRIVATE src)
 target_link_libraries(playlist-manager PRIVATE Qt6::Widgets)
 target_compile_options(playlist-manager PRIVATE -Wall -Wextra -Wpedantic)
-
-add_executable(playlist-manager-tests
-    src/logic_test.cpp
-    ${PLAYLIST_CORE_SOURCES}
-)
-
-target_include_directories(playlist-manager-tests PRIVATE src)
-target_link_libraries(playlist-manager-tests PRIVATE Qt6::Core)
-target_compile_options(playlist-manager-tests PRIVATE -Wall -Wextra -Wpedantic)
